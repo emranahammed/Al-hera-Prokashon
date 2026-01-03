@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আল হেরা প্রকাশন - অ্যাডমিন লগইন</title>
+    
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            font-family: 'Noto Sans Bengali', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .input-field {
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 640px) {
+            .login-card {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div class="login-card rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-book-open text-white text-3xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800">আল হেরা প্রকাশন</h1>
+            <p class="text-gray-600 mt-2">অ্যাডমিন প্যানেল লগইন</p>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                <div>
+                    <p class="font-medium text-red-800" id="errorText"></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Login Form -->
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">
+                    <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                    ইমেইল ঠিকানা
+                </label>
+                <input type="email" id="email" required 
+                       class="input-field w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                       placeholder="admin@alhera.com"
+                       value="admin@alhera.com">
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-medium mb-2">
+                    <i class="fas fa-lock mr-2 text-indigo-600"></i>
+                    পাসওয়ার্ড
+                </label>
+                <input type="password" id="password" required 
+                       class="input-field w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                       placeholder="********"
+                       value="Admin@123">
+                <div class="mt-1 text-right">
+                    <button type="button" onclick="togglePassword()" class="text-sm text-indigo-600 hover:text-indigo-800">
+                        <i class="fas fa-eye mr-1"></i> পাসওয়ার্ড দেখুন
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex items-center">
+                <input type="checkbox" id="rememberMe" class="h-4 w-4 text-indigo-600 rounded">
+                <label for="rememberMe" class="ml-2 text-gray-700">আমাকে মনে রাখুন</label>
+            </div>
+            
+            <button type="submit" id="loginBtn" 
+                    class="btn-primary w-full text-white font-bold py-3 px-4 rounded-lg shadow-lg">
+                <i class="fas fa-sign-in-alt mr-2"></i>
+                <span id="loginBtnText">লগইন করুন</span>
+            </button>
+        </form>
+        
+        <!-- Demo Credentials -->
+        <div class="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="font-bold text-gray-700 mb-2">ডেমো ক্রেডেনশিয়ালস:</h3>
+            <div class="text-sm text-gray-600 space-y-1">
+                <p><span class="font-medium">ইমেইল:</span> admin@alhera.com</p>
+                <p><span class="font-medium">পাসওয়ার্ড:</span> Admin@123</p>
+            </div>
+        </div>
+        
+        <!-- Setup Database -->
+        <div class="mt-6 text-center">
+            <button onclick="setupDatabase()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                <i class="fas fa-database mr-1"></i> ডাটাবেস সেটআপ করুন
+            </button>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-xl shadow-2xl mx-4 max-w-sm">
+            <div class="flex flex-col items-center">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600 mb-4"></div>
+                <p class="text-lg font-semibold text-gray-700" id="loadingText">লগইন হচ্ছে...</p>
+                <p class="text-gray-600 text-sm mt-2">অনুগ্রহ করে অপেক্ষা করুন</p>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { auth, supabase } from './supabase-client.js';
+        
+        // Check if already logged in
+        if (auth.isAdminLoggedIn()) {
+            window.location.href = 'admin-panel.html';
+        }
+        
+        // Toggle password visibility
+        window.togglePassword = function() {
+            const passwordInput = document.getElementById('password');
+            const type = passwordInput.type === 'password' ? 'text' : 'password';
+            passwordInput.type = type;
+        };
+        
+        // Setup database
+        window.setupDatabase = async function() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            
+            loadingText.textContent = 'ডাটাবেস সেটআপ হচ্ছে...';
+            loadingOverlay.classList.remove('hidden');
+            
+            try {
+                // Create admin if not exists
+                const { error } = await supabase
+                    .from('admins')
+                    .insert([{
+                        email: 'admin@alhera.com',
+                        password: 'Admin@123',
+                        name: 'সুপার অ্যাডমিন',
+                        role: 'super_admin',
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                if (error && !error.message.includes('duplicate')) {
+                    throw error;
+                }
+                
+                showMessage('success', 'ডাটাবেস সফলভাবে সেটআপ হয়েছে! এখন লগইন করুন।');
+                
+                // Auto-fill form
+                document.getElementById('email').value = 'admin@alhera.com';
+                document.getElementById('password').value = 'Admin@123';
+                
+            } catch (error) {
+                console.error('Setup error:', error);
+                showMessage('error', 'সেটআপে ত্রুটি: ' + error.message);
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        };
+        
+        // Form submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginBtnText = document.getElementById('loginBtnText');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            // Validation
+            if (!email || !password) {
+                showMessage('error', 'ইমেইল এবং পাসওয়ার্ড প্রয়োজন');
+                return;
+            }
+            
+            // Show loading
+            loginBtn.disabled = true;
+            loginBtnText.textContent = 'লগইন হচ্ছে...';
+            loadingOverlay.classList.remove('hidden');
+            
+            // Hide any previous messages
+            hideMessages();
+            
+            try {
+                const result = await auth.loginAdmin(email, password);
+                
+                if (result.success) {
+                    showMessage('success', 'লগইন সফল! অ্যাডমিন প্যানেলে যাচ্ছেন...');
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        window.location.href = 'admin-panel.html';
+                    }, 1500);
+                } else {
+                    showMessage('error', result.message || 'লগইন ব্যর্থ হয়েছে');
+                    loginBtnText.textContent = 'লগইন করুন';
+                }
+            } catch (error) {
+                showMessage('error', 'লগইন প্রক্রিয়ায় ত্রুটি: ' + error.message);
+                loginBtnText.textContent = 'লগইন করুন';
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                loginBtn.disabled = false;
+            }
+        });
+        
+        // Helper functions
+        function showMessage(type, text) {
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            
+            if (type === 'error') {
+                errorDiv.className = 'mb-4 p-4 bg-red-50 border border-red-200 rounded-lg';
+                errorDiv.classList.add('shake');
+            } else {
+                errorDiv.className = 'mb-4 p-4 bg-green-50 border border-green-200 rounded-lg';
+                errorText.className = 'font-medium text-green-800';
+            }
+            
+            errorText.textContent = text;
+            errorDiv.classList.remove('hidden');
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+                errorDiv.classList.remove('shake');
+            }, 5000);
+        }
+        
+        function hideMessages() {
+            document.getElementById('errorMessage').classList.add('hidden');
+        }
+        
+        // Enter key support
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Al-hera Admin | Pro Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Print Styling */
+@media print { 
+    .no-print { display: none !important; }
+    #print-area { 
+        display: block !important; 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100%; 
+        background: white;
+        padding: 0;
+        margin: 0;
+    }
+    body { 
+        background: white;
+        margin: 0;
+        padding: 0;
+        font-family: 'Hind Siliguri', 'Kalpurush', sans-serif !important;
+    }
+    
+    /* Hide browser's header and footer */
+    @page {
+        margin: 0;
+        size: auto;
+    }
+    
+    /* Hide URL, page number, date/time in print */
+    @page :first {
+        margin-top: 0;
+    }
+    
+    @page :left {
+        margin-left: 0;
+    }
+    
+    @page :right {
+        margin-right: 0;
+    }
+    
+    /* Hide any browser-generated content */
+    ::-webkit-scrollbar {
+        display: none;
+    }
+    
+    /* Ensure no extra margins */
+    html, body {
+        height: 100%;
+        overflow: hidden;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}
+
+        :root {
+            --primary: #2563eb;
+            --background: #f8fafc;
+            --income: #10b981;
+            --expense: #ef4444;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--background);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sidebar-link.active { 
+            background-color: var(--primary); 
+            color: white; 
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.2);
+        }
+        
+        .nav-bottom-item.active { color: var(--primary); }
+
+        .status-badge {
+            font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 4px 12px; border-radius: 9999px; border: 1px solid transparent;
+        }
+        .status-pending { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+        .status-approved { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+        .status-rejected { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        .status-deposited { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+        .status-withdrawn { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+        
+        /* Audit Log Status */
+        .status-created { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+        .status-updated { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+        .status-deleted { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .status-restored { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        .type-badge {
+            font-size: 9px; font-weight: 900; text-transform: uppercase; padding: 4px 10px; border-radius: 6px;
+        }
+        .type-income { background: #d1fae5; color: #065f46; }
+        .type-expense { background: #fee2e2; color: #991b1b; }
+        .type-principal { background: #d8b4fe; color: #6b21a8; }
+        .type-income-type { background: #c7d2fe; color: #3730a3; }
+        .type-user { background: #fbcfe8; color: #9d174d; }
+        .type-system { background: #f3e8ff; color: #6b21a8; }
+        
+        .bangla-font {
+            font-family: 'Hind Siliguri', 'Kalpurush', sans-serif;
+        }
+
+        /* Print styling updates */
+        @media print {
+            .principal-invoice { 
+                font-family: 'Hind Siliguri', 'Kalpurush', sans-serif !important;
+                direction: rtl;
+            }
+        }
+
+        /* Scroll to top button */
+        .scroll-top-btn {
+            position: fixed;
+            right: 20px;
+            bottom: 100px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #2563eb;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+            border: none;
+        }
+        
+        .scroll-top-btn:hover {
+            background: #1d4ed8;
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(37, 99, 235, 0.4);
+        }
+        
+        .scroll-top-btn.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px);
+        }
+
+        /* Filter panel styling */
+        .filter-panel {
+            transition: all 0.3s ease;
+        }
+        
+        .filter-panel.collapsed {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin-bottom: 0 !important;
+        }
+        
+        .filter-panel.expanded {
+            max-height: 500px;
+            opacity: 1;
+            margin-bottom: 1.5rem !important;
+        }
+
+        /* Audit Log Timeline */
+        .timeline-item {
+            position: relative;
+            padding-left: 30px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #e5e7eb;
+            background: white;
+        }
+        
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 12px;
+            bottom: -20px;
+            width: 2px;
+            background: #e5e7eb;
+        }
+        
+        .timeline-item:last-child::after {
+            display: none;
+        }
+        
+        /* Different colors for timeline dots */
+        .timeline-create::before { border-color: #3b82f6; background: #3b82f6; }
+        .timeline-update::before { border-color: #f59e0b; background: #f59e0b; }
+        .timeline-delete::before { border-color: #ef4444; background: #ef4444; }
+        .timeline-restore::before { border-color: #10b981; background: #10b981; }
+    </style>
+</head>
+<body class="text-slate-900">
+    <div id="app" class="min-h-screen flex flex-col no-print">
+        <!-- Auth View -->
+        <div id="auth-view" class="hidden fixed inset-0 z-[500] bg-slate-50 flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl text-center border border-slate-100">
+                <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white mx-auto mb-6">
+                    <i data-lucide="briefcase" class="w-10 h-10"></i>
+                </div>
+                <h1 class="text-2xl font-black tracking-tight text-slate-800">Al-Hera Admin</h1>
+                <p class="text-slate-400 text-sm mt-1 mb-8">Income & Expense Management</p>
+                <form id="auth-form" class="space-y-4 text-left">
+                    <input type="email" id="email" required placeholder="admin@alhera.com" class="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    <input type="password" id="password" required placeholder="••••••••" class="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none">
+                    <button type="submit" class="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold uppercase tracking-widest text-xs transition-transform active:scale-95">Sign In</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Layout -->
+        <div id="main-layout" class="hidden flex-1 flex flex-col md:flex-row">
+            <aside class="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col sticky top-0 h-screen shrink-0">
+                <div class="p-6 border-b flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg"><i data-lucide="activity"></i></div>
+                    <span class="font-black text-lg tracking-tight uppercase">Al-Hera</span>
+                </div>
+                <nav class="flex-1 p-4 space-y-1" id="nav-sidebar"></nav>
+                <div class="p-4 border-t border-slate-100">
+                    <button onclick="window.showLogoutConfirm()" class="w-full flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-xl text-sm font-bold">
+                        <i data-lucide="log-out" class="w-4 h-4"></i> Log Out
+                    </button>
+                </div>
+            </aside>
+
+            <main class="flex-1 flex flex-col min-h-0 bg-slate-50">
+                <header class="h-16 bg-white border-b border-slate-100 px-8 flex items-center justify-between sticky top-0 z-40">
+                    <h2 id="page-title" class="text-lg font-black tracking-tight text-slate-800 uppercase text-xs md:text-lg">Dashboard</h2>
+                    <div id="header-actions" class="flex items-center gap-2">
+                        <!-- Mobile Logout Button -->
+                        <button onclick="window.showLogoutConfirm()" class="md:hidden p-2 text-red-600 hover:bg-red-50 rounded-xl">
+                            <i data-lucide="log-out" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <div id="content-container" class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+                    <div id="page-content"></div>
+                </div>
+
+                <nav id="nav-bottom" class="md:hidden fixed bottom-0 left-0 right-0 h-20 glass-panel flex items-center justify-around px-4 border-t z-50">
+                    <!-- Bottom nav items will be added here -->
+                </nav>
+            </main>
+        </div>
+
+        <!-- Universal Modal -->
+        <div id="modal-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-[200] flex items-end md:items-center justify-center">
+            <div id="modal-content" class="bg-white rounded-t-[2.5rem] md:rounded-[2rem] w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl translate-y-full transition-transform duration-300">
+                <div class="p-6 border-b flex items-center justify-between sticky top-0 bg-white/95 z-10">
+                    <h3 id="modal-title" class="text-xl font-black text-slate-800 tracking-tight">Details</h3>
+                    <button onclick="window.closeModal()" class="p-2 bg-slate-50 rounded-xl hover:bg-slate-100"><i data-lucide="x"></i></button>
+                </div>
+                <div id="modal-body" class="p-6"></div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-[400] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+                <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mx-auto mb-6">
+                    <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                </div>
+                <h3 id="delete-title" class="text-xl font-black text-slate-800 text-center mb-2">Delete Entry?</h3>
+                <p id="delete-message" class="text-slate-500 text-center text-sm mb-8">Are you sure you want to delete this entry? This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button onclick="window.hideDeleteModal()" class="flex-1 bg-slate-100 text-slate-800 py-4 rounded-2xl font-bold">CANCEL</button>
+                    <button id="confirm-delete-btn" class="flex-1 bg-red-600 text-white py-4 rounded-2xl font-bold">DELETE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restore Confirmation Modal -->
+        <div id="restore-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-[400] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+                <div class="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 mx-auto mb-6">
+                    <i data-lucide="refresh-cw" class="w-8 h-8"></i>
+                </div>
+                <h3 id="restore-title" class="text-xl font-black text-slate-800 text-center mb-2">Restore Entry?</h3>
+                <p id="restore-message" class="text-slate-500 text-center text-sm mb-8">Are you sure you want to restore this deleted entry?</p>
+                <div class="flex gap-3">
+                    <button onclick="window.hideRestoreModal()" class="flex-1 bg-slate-100 text-slate-800 py-4 rounded-2xl font-bold">CANCEL</button>
+                    <button id="confirm-restore-btn" class="flex-1 bg-green-600 text-white py-4 rounded-2xl font-bold">RESTORE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout Confirmation Modal -->
+        <div id="logout-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-[400] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl">
+                <div class="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mx-auto mb-6">
+                    <i data-lucide="alert-circle" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-black text-slate-800 text-center mb-2">Log Out?</h3>
+                <p class="text-slate-500 text-center text-sm mb-8">Are you sure you want to sign out from your account?</p>
+                <div class="flex gap-3">
+                    <button onclick="window.hideLogoutModal()" class="flex-1 bg-slate-100 text-slate-800 py-4 rounded-2xl font-bold">CANCEL</button>
+                    <button onclick="window.logout()" class="flex-1 bg-red-600 text-white py-4 rounded-2xl font-bold">YES, LOGOUT</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast" class="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 opacity-0 pointer-events-none transition-all duration-500 z-[300] bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+            <span id="toast-msg" class="text-[10px] font-black uppercase tracking-widest">Message</span>
+        </div>
+    </div>
+
+    <!-- Hidden Print Area -->
+    <div id="print-area" class="hidden"></div>
+
+    <!-- Scroll to Top Button -->
+    <button id="scrollToTopBtn" class="scroll-top-btn hidden no-print">
+        <i data-lucide="chevron-up" class="w-6 h-6"></i>
+    </button>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            onAuthStateChanged, 
+            signOut,
+            createUserWithEmailAndPassword 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            serverTimestamp, 
+            setDoc,
+            query,
+            where,
+            orderBy
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDGY3yt9Qq0BZLrc1ILymguT_HhUakaOSE",
+            authDomain: "alhera-54c30.firebaseapp.com",
+            projectId: "alhera-54c30",
+            storageBucket: "alhera-54c30.firebasestorage.app",
+            messagingSenderId: "190405467390",
+            appId: "1:190405467390:web:244331f614d5aec37059af"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = "office-expense-sys";
+
+        let currentUser = null;
+        let userData = null;
+        let allOrders = [];
+        let allIncomes = [];
+        let allUsers = [];
+        let allTitles = []; 
+        let allIncomeTypes = [];
+        let allPrincipalTransactions = [];
+        let allAuditLogs = [];
+        let allDeletedEntries = [];
+        let currentSummaryDate = ""; 
+        let entryToDelete = null;
+        let entryToRestore = null;
+
+        // Search and filter variables
+        let transactionFilter = {
+            startDate: '',
+            endDate: '',
+            type: 'all',
+            user: 'all',
+            searchText: ''
+        };
+
+        let auditFilter = {
+            action: 'all',
+            entityType: 'all',
+            user: 'all',
+            startDate: '',
+            endDate: ''
+        };
+
+        // পাসওয়ার্ড স্টোরেজের জন্য একটি ম্যাপ
+        let userPasswords = {};
+
+        function refreshIcons() { if (window.lucide) window.lucide.createIcons(); }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid));
+                userData = snap.exists() ? snap.data() : { uid: user.uid, name: user.email.split('@')[0], email: user.email, role: 'admin' };
+                
+                document.getElementById('auth-view').classList.add('hidden');
+                document.getElementById('main-layout').classList.remove('hidden');
+                
+                renderNavigation();
+                window.navigateTo('dashboard');
+                startDataSync();
+            } else {
+                document.getElementById('main-layout').classList.add('hidden');
+                document.getElementById('auth-view').classList.remove('hidden');
+            }
+            refreshIcons();
+        });
+
+        // Helper function to create audit log
+        async function createAuditLog(action, entityType, entityId, entityName, details = {}) {
+            try {
+                const auditData = {
+                    action: action, // 'created', 'updated', 'deleted', 'restored'
+                    entityType: entityType, // 'income', 'expense', 'principal', 'income_type', 'user'
+                    entityId: entityId,
+                    entityName: entityName,
+                    userId: currentUser.uid,
+                    userName: userData.name,
+                    userEmail: userData.email,
+                    userRole: userData.role,
+                    details: details,
+                    timestamp: serverTimestamp(),
+                    ipAddress: '', // You can add IP tracking if needed
+                    userAgent: navigator.userAgent
+                };
+                
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'auditLogs'), auditData);
+            } catch (error) {
+                console.error("Error creating audit log:", error);
+            }
+        }
+
+        // Helper function to move to deleted entries
+        async function moveToDeletedEntries(collectionName, docId, data, deletedBy) {
+            try {
+                const deletedEntry = {
+                    originalId: docId,
+                    originalCollection: collectionName,
+                    data: data,
+                    deletedBy: {
+                        userId: deletedBy.uid,
+                        userName: deletedBy.name,
+                        userEmail: deletedBy.email,
+                        userRole: deletedBy.role
+                    },
+                    deletedAt: serverTimestamp(),
+                    restored: false
+                };
+                
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'deletedEntries'), deletedEntry);
+            } catch (error) {
+                console.error("Error moving to deleted entries:", error);
+            }
+        }
+
+        // Helper function to restore from deleted entries
+        async function restoreFromDeletedEntries(deletedEntryId) {
+            try {
+                const deletedEntryDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'deletedEntries', deletedEntryId));
+                if (!deletedEntryDoc.exists()) return null;
+                
+                const deletedEntry = deletedEntryDoc.data();
+                const { originalCollection, originalId, data } = deletedEntry;
+                
+                // Restore to original collection
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', originalCollection, originalId), {
+                    ...data,
+                    restoredAt: serverTimestamp(),
+                    restoredBy: {
+                        userId: currentUser.uid,
+                        userName: userData.name,
+                        userEmail: userData.email
+                    }
+                });
+                
+                // Mark as restored in deleted entries
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'deletedEntries', deletedEntryId), {
+                    restored: true,
+                    restoredAt: serverTimestamp(),
+                    restoredBy: {
+                        userId: currentUser.uid,
+                        userName: userData.name,
+                        userEmail: userData.email
+                    }
+                });
+                
+                return originalId;
+            } catch (error) {
+                console.error("Error restoring deleted entry:", error);
+                return null;
+            }
+        }
+
+        function renderNavigation() {
+            const links = [
+                { id: 'dashboard', icon: 'layout-grid', label: 'Home', roles: ['staff', 'manager', 'admin'] },
+                { id: 'income', icon: 'trending-up', label: 'Income', roles: ['staff', 'manager', 'admin'] },
+                { id: 'income-summary', icon: 'pie-chart', label: 'Income Summary', roles: ['manager', 'admin'] },
+                { id: 'income-types', icon: 'tag', label: 'Income Types', roles: ['manager', 'admin'] },
+                { id: 'entries', icon: 'trending-down', label: 'Expenses', roles: ['staff', 'manager', 'admin'] },
+                { id: 'transactions', icon: 'activity', label: 'Transactions', roles: ['staff', 'manager', 'admin'] },
+                { id: 'summary', icon: 'file-bar-chart', label: 'Summary', roles: ['manager', 'admin'] },
+                { id: 'principal-transactions', icon: 'user', label: 'Principal', roles: ['manager', 'admin'] },
+                { id: 'audit-log', icon: 'shield-alert', label: 'Audit Log', roles: ['manager', 'admin'] },
+                { id: 'deleted-entries', icon: 'trash-2', label: 'Deleted', roles: ['manager', 'admin'] }
+            ].filter(l => l.roles.includes(userData.role));
+
+            document.getElementById('nav-sidebar').innerHTML = links.map(l => `
+                <button onclick="window.navigateTo('${l.id}')" data-nav="${l.id}" class="sidebar-link w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-slate-500 font-bold transition-all">
+                    <i data-lucide="${l.icon}" class="w-5 h-5"></i><span class="text-sm">${l.label}</span>
+                </button>
+            `).join('');
+
+            document.getElementById('nav-bottom').innerHTML = links.map(l => `
+                <button onclick="window.navigateTo('${l.id}')" data-nav="${l.id}" class="nav-bottom-item flex flex-col items-center gap-1 text-slate-400">
+                    <i data-lucide="${l.icon}" class="w-6 h-6"></i>
+                    <span class="text-[9px] font-black uppercase">${l.label}</span>
+                </button>
+            `).join('');
+            refreshIcons();
+        }
+
+        window.navigateTo = (page) => {
+            document.querySelectorAll('[data-nav]').forEach(el => el.classList.toggle('active', el.dataset.nav === page));
+            const actions = document.getElementById('header-actions');
+            const title = document.getElementById('page-title');
+            
+            // Clear previous actions but keep mobile logout button
+            actions.innerHTML = `
+                <button onclick="window.showLogoutConfirm()" class="md:hidden p-2 text-red-600 hover:bg-red-50 rounded-xl">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            `;
+
+            if(page === 'dashboard') {
+                title.textContent = "Overview";
+                actions.innerHTML += `
+                    <button onclick="window.openIncomeModal()" class="bg-green-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black shadow-lg uppercase">+ INCOME</button>
+                    <button onclick="window.openPrincipalTransactionModal()" class="bg-purple-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black shadow-lg uppercase">PRINCIPAL TRANSACTION</button>
+                `;
+                renderDashboard();
+            } else if(page === 'income') {
+                title.textContent = "Income Records";
+                actions.innerHTML += `<button onclick="window.openIncomeModal()" class="bg-green-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">+ ADD INCOME</button>`;
+                renderIncome();
+            } else if(page === 'income-summary') {
+                title.textContent = "Income Summary";
+                renderIncomeSummary();
+            } else if(page === 'income-types') {
+                title.textContent = "Income Types";
+                actions.innerHTML += `<button onclick="window.openAddIncomeTypeModal()" class="bg-green-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">+ ADD TYPE</button>`;
+                renderIncomeTypes();
+            } else if(page === 'summary') {
+                title.textContent = "Daily Summary";
+                renderSummary();
+            } else if(page === 'entries') {
+                title.textContent = "Expense History";
+                renderEntries();
+            } else if(page === 'transactions') {
+                title.textContent = "All Transactions";
+                actions.innerHTML += `<button onclick="window.toggleTransactionFilter()" class="bg-blue-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">FILTERS</button>`;
+                renderTransactions();
+            } else if(page === 'principal-transactions') {
+                title.textContent = "Principal Transactions";
+                actions.innerHTML += `<button onclick="window.openPrincipalTransactionModal()" class="bg-purple-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">+ TRANSACTION</button>`;
+                renderPrincipalTransactions();
+            } else if(page === 'audit-log') {
+                title.textContent = "Audit Log";
+                actions.innerHTML += `<button onclick="window.toggleAuditFilter()" class="bg-blue-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">FILTERS</button>`;
+                renderAuditLog();
+            } else if(page === 'deleted-entries') {
+                title.textContent = "Deleted Entries";
+                actions.innerHTML += `<button onclick="window.toggleDeletedFilter()" class="bg-blue-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase">FILTERS</button>`;
+                renderDeletedEntries();
+            }
+            refreshIcons();
+        };
+
+        // AUDIT LOG PAGE
+        function renderAuditLog() {
+            // Apply filters
+            let filteredLogs = allAuditLogs;
+            
+            if (auditFilter.action !== 'all') {
+                filteredLogs = filteredLogs.filter(log => log.action === auditFilter.action);
+            }
+            
+            if (auditFilter.entityType !== 'all') {
+                filteredLogs = filteredLogs.filter(log => log.entityType === auditFilter.entityType);
+            }
+            
+            if (auditFilter.user !== 'all') {
+                filteredLogs = filteredLogs.filter(log => log.userId === auditFilter.user);
+            }
+            
+            if (auditFilter.startDate) {
+                filteredLogs = filteredLogs.filter(log => {
+                    const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                    return logDate >= new Date(auditFilter.startDate);
+                });
+            }
+            
+            if (auditFilter.endDate) {
+                filteredLogs = filteredLogs.filter(log => {
+                    const logDate = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                    const endDate = new Date(auditFilter.endDate);
+                    endDate.setHours(23, 59, 59, 999);
+                    return logDate <= endDate;
+                });
+            }
+            
+            // Get unique users for filter dropdown
+            const uniqueUsers = [...new Set(allAuditLogs.map(log => log.userId))]
+                .map(userId => {
+                    const user = allUsers.find(u => u.uid === userId) || allAuditLogs.find(log => log.userId === userId);
+                    return { id: userId, name: user ? user.userName : 'Unknown User' };
+                })
+                .filter((user, index, self) => 
+                    index === self.findIndex((u) => u.id === user.id)
+                );
+
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">System Audit Log</h4>
+                                <p class="text-sm text-slate-600">Track all create, update, delete, and restore actions in the system.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Actions: ${allAuditLogs.length} | Filtered: ${filteredLogs.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Audit Filter Panel -->
+                <div id="audit-filter-panel" class="filter-panel collapsed bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <!-- Action Type -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Action Type</label>
+                            <select id="audit-action-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all" ${auditFilter.action === 'all' ? 'selected' : ''}>All Actions</option>
+                                <option value="created" ${auditFilter.action === 'created' ? 'selected' : ''}>Created</option>
+                                <option value="updated" ${auditFilter.action === 'updated' ? 'selected' : ''}>Updated</option>
+                                <option value="deleted" ${auditFilter.action === 'deleted' ? 'selected' : ''}>Deleted</option>
+                                <option value="restored" ${auditFilter.action === 'restored' ? 'selected' : ''}>Restored</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Entity Type -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entity Type</label>
+                            <select id="audit-entity-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all" ${auditFilter.entityType === 'all' ? 'selected' : ''}>All Entities</option>
+                                <option value="income" ${auditFilter.entityType === 'income' ? 'selected' : ''}>Income</option>
+                                <option value="expense" ${auditFilter.entityType === 'expense' ? 'selected' : ''}>Expense</option>
+                                <option value="principal" ${auditFilter.entityType === 'principal' ? 'selected' : ''}>Principal</option>
+                                <option value="income_type" ${auditFilter.entityType === 'income_type' ? 'selected' : ''}>Income Type</option>
+                                <option value="user" ${auditFilter.entityType === 'user' ? 'selected' : ''}>User</option>
+                            </select>
+                        </div>
+                        
+                        <!-- User Filter -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User</label>
+                            <select id="audit-user-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all" ${auditFilter.user === 'all' ? 'selected' : ''}>All Users</option>
+                                ${uniqueUsers.map(user => `
+                                    <option value="${user.id}" ${auditFilter.user === user.id ? 'selected' : ''}>${user.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <!-- Date Range -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Start Date</label>
+                            <input type="date" id="audit-start-date" value="${auditFilter.startDate}" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">End Date</label>
+                            <input type="date" id="audit-end-date" value="${auditFilter.endDate}" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="flex gap-3">
+                        <button onclick="window.applyAuditFilter()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            APPLY FILTERS
+                        </button>
+                        <button onclick="window.resetAuditFilter()" class="flex-1 bg-slate-100 text-slate-800 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            RESET FILTERS
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Audit Log Timeline -->
+                <div class="space-y-6">
+                    ${filteredLogs.map(log => {
+                        const timestamp = log.timestamp?.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+                        const timeAgo = getTimeAgo(timestamp);
+                        const formattedTime = timestamp.toLocaleString();
+                        
+                        // Get icon based on action
+                        let icon = 'edit-3';
+                        let iconColor = 'text-blue-600';
+                        let bgColor = 'bg-blue-50';
+                        
+                        if (log.action === 'created') {
+                            icon = 'plus-circle';
+                            iconColor = 'text-green-600';
+                            bgColor = 'bg-green-50';
+                        } else if (log.action === 'deleted') {
+                            icon = 'trash-2';
+                            iconColor = 'text-red-600';
+                            bgColor = 'bg-red-50';
+                        } else if (log.action === 'restored') {
+                            icon = 'refresh-cw';
+                            iconColor = 'text-purple-600';
+                            bgColor = 'bg-purple-50';
+                        }
+                        
+                        // Get entity type display name
+                        const entityTypeNames = {
+                            'income': 'Income',
+                            'expense': 'Expense',
+                            'principal': 'Principal Transaction',
+                            'income_type': 'Income Type',
+                            'user': 'User'
+                        };
+                        
+                        const entityTypeName = entityTypeNames[log.entityType] || log.entityType;
+                        
+                        return `
+                            <div class="timeline-item timeline-${log.action}">
+                                <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-start gap-4 flex-1">
+                                            <div class="w-12 h-12 rounded-2xl ${bgColor} ${iconColor} flex items-center justify-center shrink-0">
+                                                <i data-lucide="${icon}" class="w-5 h-5"></i>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-3 mb-2">
+                                                    <span class="status-badge status-${log.action}">${log.action.toUpperCase()}</span>
+                                                    <span class="type-badge type-${log.entityType}">${entityTypeName.toUpperCase()}</span>
+                                                </div>
+                                                <p class="text-sm font-black text-slate-800 mb-1">${log.entityName}</p>
+                                                <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400">
+                                                    <span>By: ${log.userName} (${log.userRole})</span>
+                                                    <span>•</span>
+                                                    <span>${formattedTime}</span>
+                                                    <span>•</span>
+                                                    <span>${timeAgo}</span>
+                                                </div>
+                                                
+                                                <!-- Details Section -->
+                                                ${log.details && Object.keys(log.details).length > 0 ? `
+                                                    <div class="mt-3 p-3 bg-slate-50 rounded-xl">
+                                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Details:</p>
+                                                        <pre class="text-[9px] text-slate-600 whitespace-pre-wrap">${JSON.stringify(log.details, null, 2)}</pre>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Action Buttons -->
+                                        <div class="flex gap-1">
+                                            ${log.action === 'deleted' && log.entityType !== 'user' ? `
+                                                <button onclick="window.viewDeletedEntry('${log.entityId}', '${log.entityType}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick="window.restoreAuditEntry('${log.entityId}', '${log.entityType}', '${log.entityName}')" class="p-2 bg-slate-50 text-slate-400 hover:text-green-600 rounded-xl">
+                                                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                                </button>
+                                            ` : `
+                                                <button onclick="window.viewAuditDetails('${log.id}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                                    <i data-lucide="info" class="w-4 h-4"></i>
+                                                </button>
+                                            `}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO AUDIT LOGS FOUND</p>'}
+                </div>
+                
+                <!-- Summary Statistics -->
+                ${filteredLogs.length > 0 ? `
+                    <div class="mt-8 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Audit Summary</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Created</p>
+                                <p class="text-2xl font-black text-green-600">
+                                    ${filteredLogs.filter(log => log.action === 'created').length}
+                                </p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Updated</p>
+                                <p class="text-2xl font-black text-blue-600">
+                                    ${filteredLogs.filter(log => log.action === 'updated').length}
+                                </p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Deleted</p>
+                                <p class="text-2xl font-black text-red-600">
+                                    ${filteredLogs.filter(log => log.action === 'deleted').length}
+                                </p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Restored</p>
+                                <p class="text-2xl font-black text-purple-600">
+                                    ${filteredLogs.filter(log => log.action === 'restored').length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+            
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Helper function for time ago
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = Math.floor(seconds / 31536000);
+            if (interval > 1) return interval + " years ago";
+            if (interval === 1) return "1 year ago";
+            
+            interval = Math.floor(seconds / 2592000);
+            if (interval > 1) return interval + " months ago";
+            if (interval === 1) return "1 month ago";
+            
+            interval = Math.floor(seconds / 86400);
+            if (interval > 1) return interval + " days ago";
+            if (interval === 1) return "1 day ago";
+            
+            interval = Math.floor(seconds / 3600);
+            if (interval > 1) return interval + " hours ago";
+            if (interval === 1) return "1 hour ago";
+            
+            interval = Math.floor(seconds / 60);
+            if (interval > 1) return interval + " minutes ago";
+            if (interval === 1) return "1 minute ago";
+            
+            return "just now";
+        }
+
+        window.toggleAuditFilter = () => {
+            const filterPanel = document.getElementById('audit-filter-panel');
+            if (!filterPanel) {
+                renderAuditLog();
+                const newFilterPanel = document.getElementById('audit-filter-panel');
+                newFilterPanel.classList.toggle('collapsed');
+                newFilterPanel.classList.toggle('expanded');
+            } else {
+                filterPanel.classList.toggle('collapsed');
+                filterPanel.classList.toggle('expanded');
+            }
+        };
+
+        window.applyAuditFilter = () => {
+            auditFilter.action = document.getElementById('audit-action-filter').value;
+            auditFilter.entityType = document.getElementById('audit-entity-filter').value;
+            auditFilter.user = document.getElementById('audit-user-filter').value;
+            auditFilter.startDate = document.getElementById('audit-start-date').value;
+            auditFilter.endDate = document.getElementById('audit-end-date').value;
+            
+            renderAuditLog();
+        };
+
+        window.resetAuditFilter = () => {
+            auditFilter = {
+                action: 'all',
+                entityType: 'all',
+                user: 'all',
+                startDate: '',
+                endDate: ''
+            };
+            
+            if (document.getElementById('audit-action-filter')) {
+                document.getElementById('audit-action-filter').value = 'all';
+                document.getElementById('audit-entity-filter').value = 'all';
+                document.getElementById('audit-user-filter').value = 'all';
+                document.getElementById('audit-start-date').value = '';
+                document.getElementById('audit-end-date').value = '';
+            }
+            
+            renderAuditLog();
+        };
+
+        window.viewAuditDetails = (auditId) => {
+            const auditLog = allAuditLogs.find(log => log.id === auditId);
+            if (!auditLog) return;
+            
+            const timestamp = auditLog.timestamp?.toDate ? auditLog.timestamp.toDate() : new Date(auditLog.timestamp);
+            const formattedTime = timestamp.toLocaleString();
+            
+            document.getElementById('modal-title').textContent = "Audit Log Details";
+            document.getElementById('modal-body').innerHTML = `
+                <div class="space-y-6">
+                    <!-- Basic Info -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ACTION DETAILS</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Action</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.action.toUpperCase()}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entity Type</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.entityType.toUpperCase()}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entity Name</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.entityName}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Entity ID</p>
+                                <p class="text-sm font-black text-slate-800 truncate">${auditLog.entityId}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Info -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">USER INFORMATION</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Name</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.userName}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Role</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.userRole}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Email</p>
+                                <p class="text-sm font-black text-slate-800">${auditLog.userEmail}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User ID</p>
+                                <p class="text-sm font-black text-slate-800 truncate">${auditLog.userId}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Timestamp -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">TIMESTAMP</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Date & Time</p>
+                                <p class="text-sm font-black text-slate-800">${formattedTime}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Time Ago</p>
+                                <p class="text-sm font-black text-slate-800">${getTimeAgo(timestamp)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Details -->
+                    ${auditLog.details && Object.keys(auditLog.details).length > 0 ? `
+                        <div class="bg-slate-50 p-6 rounded-2xl">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ADDITIONAL DETAILS</h4>
+                            <pre class="text-xs bg-white p-4 rounded-xl border border-slate-200 overflow-auto max-h-96">${JSON.stringify(auditLog.details, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- User Agent -->
+                    ${auditLog.userAgent ? `
+                        <div class="bg-slate-50 p-6 rounded-2xl">
+                            <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">BROWSER INFORMATION</h4>
+                            <p class="text-xs text-slate-600">${auditLog.userAgent}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            window.openModalUI();
+        };
+
+        // DELETED ENTRIES PAGE
+        function renderDeletedEntries() {
+            // Get unique collection types for filter
+            const uniqueCollections = [...new Set(allDeletedEntries.map(entry => entry.originalCollection))];
+            
+            // Get unique users for filter
+            const uniqueUsers = [...new Set(allDeletedEntries.map(entry => entry.deletedBy.userId))];
+            
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Deleted Entries Recovery</h4>
+                                <p class="text-sm text-slate-600">View and restore deleted entries from the system.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Deleted: ${allDeletedEntries.length} | Restored: ${allDeletedEntries.filter(e => e.restored).length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filter Panel -->
+                <div id="deleted-filter-panel" class="filter-panel collapsed bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                        <!-- Collection Type -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Collection Type</label>
+                            <select id="deleted-collection-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all">All Collections</option>
+                                ${uniqueCollections.map(collection => `
+                                    <option value="${collection}">${collection.replace('_', ' ').toUpperCase()}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <!-- Restored Status -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</label>
+                            <select id="deleted-status-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all">All Status</option>
+                                <option value="deleted">Deleted Only</option>
+                                <option value="restored">Restored Only</option>
+                            </select>
+                        </div>
+                        
+                        <!-- User Filter -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deleted By</label>
+                            <select id="deleted-user-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all">All Users</option>
+                                ${uniqueUsers.map(userId => {
+                                    const entry = allDeletedEntries.find(e => e.deletedBy.userId === userId);
+                                    return entry ? `
+                                        <option value="${userId}">${entry.deletedBy.userName}</option>
+                                    ` : '';
+                                }).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="flex gap-3">
+                        <button onclick="window.applyDeletedFilter()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            APPLY FILTERS
+                        </button>
+                        <button onclick="window.resetDeletedFilter()" class="flex-1 bg-slate-100 text-slate-800 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            RESET FILTERS
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Deleted Entries List -->
+                <div class="space-y-3">
+                    ${allDeletedEntries.map(entry => {
+                        const deletedAt = entry.deletedAt?.toDate ? entry.deletedAt.toDate() : new Date(entry.deletedAt);
+                        const deletedTime = deletedAt.toLocaleString();
+                        const timeAgo = getTimeAgo(deletedAt);
+                        
+                        // Get collection display name
+                        const collectionNames = {
+                            'incomes': 'Income',
+                            'orders': 'Expense',
+                            'principalTransactions': 'Principal Transaction',
+                            'incomeTypes': 'Income Type'
+                        };
+                        
+                        const collectionName = collectionNames[entry.originalCollection] || entry.originalCollection;
+                        
+                        // Extract entity name from data
+                        let entityName = 'Unknown Entry';
+                        if (entry.data.entryName) entityName = entry.data.entryName;
+                        else if (entry.data.source) entityName = entry.data.source;
+                        else if (entry.data.purpose) entityName = entry.data.purpose;
+                        else if (entry.data.name) entityName = entry.data.name;
+                        
+                        return `
+                            <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between ${entry.restored ? 'opacity-60' : ''}">
+                                <div class="flex items-center gap-4 flex-1">
+                                    <div class="w-12 h-12 rounded-2xl ${entry.restored ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'} flex items-center justify-center shrink-0">
+                                        <i data-lucide="${entry.restored ? 'check-circle' : 'trash-2'}" class="w-5 h-5"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-3 mb-1">
+                                            <span class="type-badge ${entry.restored ? 'type-income' : 'type-expense'}">
+                                                ${collectionName.toUpperCase()}
+                                            </span>
+                                            ${entry.restored ? `
+                                                <span class="status-badge status-restored">RESTORED</span>
+                                            ` : `
+                                                <span class="status-badge status-deleted">DELETED</span>
+                                            `}
+                                        </div>
+                                        <p class="text-sm font-black text-slate-800 truncate">${entityName}</p>
+                                        <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                                            <span>Deleted by: ${entry.deletedBy.userName}</span>
+                                            <span>•</span>
+                                            <span>${deletedTime}</span>
+                                            <span>•</span>
+                                            <span>${timeAgo}</span>
+                                        </div>
+                                        
+                                        ${entry.restored && entry.restoredBy ? `
+                                            <div class="flex items-center gap-2 text-[9px] font-bold text-green-400 mt-1">
+                                                <span>Restored by: ${entry.restoredBy.userName}</span>
+                                                <span>•</span>
+                                                <span>${entry.restoredAt?.toDate ? entry.restoredAt.toDate().toLocaleString() : ''}</span>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                                
+                                <!-- Action Buttons -->
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right">
+                                        ${entry.data.amount || entry.data.totalAmount ? `
+                                            <p class="text-sm font-black text-slate-800">
+                                                ৳ ${(entry.data.amount || entry.data.totalAmount).toLocaleString()}
+                                            </p>
+                                        ` : ''}
+                                    </div>
+                                    <div class="flex gap-1">
+                                        <button onclick="window.viewDeletedEntryDetails('${entry.id}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                        ${!entry.restored ? `
+                                            <button onclick="window.restoreDeletedEntry('${entry.id}', '${entityName}')" class="p-2 bg-slate-50 text-slate-400 hover:text-green-600 rounded-xl">
+                                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                            </button>
+                                            <button onclick="window.permanentlyDeleteEntry('${entry.id}', '${entityName}')" class="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-xl">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO DELETED ENTRIES FOUND</p>'}
+                </div>
+            `;
+            
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        window.toggleDeletedFilter = () => {
+            const filterPanel = document.getElementById('deleted-filter-panel');
+            if (!filterPanel) {
+                renderDeletedEntries();
+                const newFilterPanel = document.getElementById('deleted-filter-panel');
+                newFilterPanel.classList.toggle('collapsed');
+                newFilterPanel.classList.toggle('expanded');
+            } else {
+                filterPanel.classList.toggle('collapsed');
+                filterPanel.classList.toggle('expanded');
+            }
+        };
+
+        window.applyDeletedFilter = () => {
+            // Filter implementation for deleted entries
+            renderDeletedEntries();
+        };
+
+        window.resetDeletedFilter = () => {
+            // Reset filter implementation
+            renderDeletedEntries();
+        };
+
+        window.viewDeletedEntryDetails = (deletedEntryId) => {
+            const entry = allDeletedEntries.find(e => e.id === deletedEntryId);
+            if (!entry) return;
+            
+            const deletedAt = entry.deletedAt?.toDate ? entry.deletedAt.toDate() : new Date(entry.deletedAt);
+            const deletedTime = deletedAt.toLocaleString();
+            
+            document.getElementById('modal-title').textContent = "Deleted Entry Details";
+            document.getElementById('modal-body').innerHTML = `
+                <div class="space-y-6">
+                    <!-- Entry Information -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ENTRY INFORMATION</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Original Collection</p>
+                                <p class="text-sm font-black text-slate-800">${entry.originalCollection}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Original ID</p>
+                                <p class="text-sm font-black text-slate-800 truncate">${entry.originalId}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</p>
+                                <p class="text-sm font-black ${entry.restored ? 'text-green-600' : 'text-red-600'}">
+                                    ${entry.restored ? 'RESTORED' : 'DELETED'}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deleted At</p>
+                                <p class="text-sm font-black text-slate-800">${deletedTime}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Deleted By -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">DELETED BY</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Name</p>
+                                <p class="text-sm font-black text-slate-800">${entry.deletedBy.userName}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Email</p>
+                                <p class="text-sm font-black text-slate-800">${entry.deletedBy.userEmail}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User Role</p>
+                                <p class="text-sm font-black text-slate-800">${entry.deletedBy.userRole}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User ID</p>
+                                <p class="text-sm font-black text-slate-800 truncate">${entry.deletedBy.userId}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${entry.restored ? `
+                        <!-- Restored Info -->
+                        <div class="bg-green-50 p-6 rounded-2xl">
+                            <h4 class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-4">RESTORED INFORMATION</h4>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-[9px] font-black text-green-600 uppercase tracking-widest">Restored By</p>
+                                    <p class="text-sm font-black text-slate-800">${entry.restoredBy.userName}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black text-green-600 uppercase tracking-widest">Restored At</p>
+                                    <p class="text-sm font-black text-slate-800">${entry.restoredAt?.toDate ? entry.restoredAt.toDate().toLocaleString() : ''}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Entry Data -->
+                    <div class="bg-slate-50 p-6 rounded-2xl">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">ORIGINAL DATA</h4>
+                        <pre class="text-xs bg-white p-4 rounded-xl border border-slate-200 overflow-auto max-h-96">${JSON.stringify(entry.data, null, 2)}</pre>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    ${!entry.restored ? `
+                        <div class="flex gap-3">
+                            <button onclick="window.restoreDeletedEntry('${entry.id}', '${entry.data.entryName || entry.data.source || 'this entry'}')" class="flex-1 bg-green-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                                <i data-lucide="refresh-cw" class="w-4 h-4 inline-block mr-2"></i> RESTORE ENTRY
+                            </button>
+                            <button onclick="window.permanentlyDeleteEntry('${entry.id}', '${entry.data.entryName || entry.data.source || 'this entry'}')" class="flex-1 bg-red-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                                <i data-lucide="trash-2" class="w-4 h-4 inline-block mr-2"></i> DELETE PERMANENTLY
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            window.openModalUI();
+        };
+
+        window.restoreDeletedEntry = (deletedEntryId, entryName) => {
+            entryToRestore = deletedEntryId;
+            document.getElementById('restore-title').textContent = "Restore Entry?";
+            document.getElementById('restore-message').textContent = `Are you sure you want to restore "${entryName}"?`;
+            
+            const confirmBtn = document.getElementById('confirm-restore-btn');
+            confirmBtn.onclick = async () => {
+                try {
+                    const restoredId = await restoreFromDeletedEntries(entryToRestore);
+                    if (restoredId) {
+                        // Create audit log for restoration
+                        const deletedEntry = allDeletedEntries.find(e => e.id === entryToRestore);
+                        if (deletedEntry) {
+                            await createAuditLog('restored', 
+                                deletedEntry.originalCollection === 'orders' ? 'expense' : 
+                                deletedEntry.originalCollection === 'principalTransactions' ? 'principal' :
+                                deletedEntry.originalCollection === 'incomeTypes' ? 'income_type' : 'income',
+                                restoredId,
+                                deletedEntry.data.entryName || deletedEntry.data.source || deletedEntry.data.purpose || deletedEntry.data.name,
+                                { restoredFrom: deletedEntryId }
+                            );
+                        }
+                        
+                        window.showToast("ENTRY RESTORED SUCCESSFULLY");
+                        window.hideRestoreModal();
+                        
+                        // Refresh the view
+                        if (window.navigateTo) {
+                            const currentPage = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                            if (currentPage) {
+                                const page = currentPage.getAttribute('onclick').match(/'([^']+)'/)[1];
+                                window.navigateTo(page);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error restoring entry:", error);
+                    window.showToast("ERROR RESTORING ENTRY");
+                }
+            };
+            
+            document.getElementById('restore-modal').classList.remove('hidden');
+        };
+
+        window.permanentlyDeleteEntry = (deletedEntryId, entryName) => {
+            entryToDelete = deletedEntryId;
+            document.getElementById('delete-title').textContent = "Delete Permanently?";
+            document.getElementById('delete-message').textContent = `Are you sure you want to permanently delete "${entryName}"? This action cannot be undone and the entry will be lost forever.`;
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.onclick = async () => {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'deletedEntries', entryToDelete));
+                    window.showToast("ENTRY PERMANENTLY DELETED");
+                    window.hideDeleteModal();
+                    renderDeletedEntries();
+                } catch (error) {
+                    console.error("Error permanently deleting:", error);
+                    window.showToast("ERROR DELETING ENTRY");
+                }
+            };
+            
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+
+        window.hideRestoreModal = () => {
+            document.getElementById('restore-modal').classList.add('hidden');
+            entryToRestore = null;
+        };
+
+        window.viewDeletedEntry = (entityId, entityType) => {
+            // Find the deleted entry
+            const deletedEntry = allDeletedEntries.find(entry => 
+                entry.originalId === entityId && 
+                entry.originalCollection === (entityType === 'expense' ? 'orders' : 
+                                            entityType === 'principal' ? 'principalTransactions' :
+                                            entityType === 'income' ? 'incomes' : 'incomeTypes')
+            );
+            
+            if (deletedEntry) {
+                window.viewDeletedEntryDetails(deletedEntry.id);
+            } else {
+                window.showToast("DELETED ENTRY NOT FOUND");
+            }
+        };
+
+        window.restoreAuditEntry = async (entityId, entityType, entityName) => {
+            // Find the deleted entry
+            const deletedEntry = allDeletedEntries.find(entry => 
+                entry.originalId === entityId && 
+                !entry.restored &&
+                entry.originalCollection === (entityType === 'expense' ? 'orders' : 
+                                            entityType === 'principal' ? 'principalTransactions' :
+                                            entityType === 'income' ? 'incomes' : 'incomeTypes')
+            );
+            
+            if (deletedEntry) {
+                window.restoreDeletedEntry(deletedEntry.id, entityName);
+            } else {
+                window.showToast("DELETED ENTRY NOT FOUND OR ALREADY RESTORED");
+            }
+        };
+
+        // Update existing delete functions to create audit logs and move to deleted entries
+        window.deleteEntry = async (id) => {
+            try {
+                // Get the entry before deleting
+                const orderDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id));
+                if (!orderDoc.exists()) {
+                    window.showToast("ENTRY NOT FOUND");
+                    return;
+                }
+                
+                const orderData = orderDoc.data();
+                
+                // Move to deleted entries
+                await moveToDeletedEntries('orders', id, orderData, {
+                    uid: currentUser.uid,
+                    name: userData.name,
+                    email: userData.email,
+                    role: userData.role
+                });
+                
+                // Create audit log
+                await createAuditLog('deleted', 'expense', id, orderData.entryName, {
+                    amount: orderData.totalAmount,
+                    date: orderData.purchaseDate,
+                    user: orderData.userName
+                });
+                
+                // Delete from original collection
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', id));
+                
+                window.showToast("ENTRY DELETED SUCCESSFULLY");
+                window.hideDeleteModal();
+                
+                if(document.getElementById('modal-overlay').classList.contains('hidden') === false) {
+                    window.closeModal();
+                }
+            } catch (error) {
+                console.error("Error deleting entry:", error);
+                window.showToast("ERROR DELETING ENTRY");
+            }
+        };
+
+        // Update income delete function
+        window.confirmDeleteIncome = (incomeId, incomeName = "this income") => {
+            entryToDelete = incomeId;
+            document.getElementById('delete-title').textContent = "Delete Income?";
+            document.getElementById('delete-message').textContent = `Are you sure you want to delete "${incomeName}"?`;
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.onclick = async () => {
+                try {
+                    // Get the income before deleting
+                    const incomeDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomes', incomeId));
+                    if (!incomeDoc.exists()) {
+                        window.showToast("INCOME NOT FOUND");
+                        return;
+                    }
+                    
+                    const incomeData = incomeDoc.data();
+                    
+                    // Move to deleted entries
+                    await moveToDeletedEntries('incomes', incomeId, incomeData, {
+                        uid: currentUser.uid,
+                        name: userData.name,
+                        email: userData.email,
+                        role: userData.role
+                    });
+                    
+                    // Create audit log
+                    await createAuditLog('deleted', 'income', incomeId, incomeData.source, {
+                        amount: incomeData.amount,
+                        date: incomeData.date,
+                        type: incomeData.type
+                    });
+                    
+                    // Delete from original collection
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomes', incomeId));
+                    
+                    window.showToast("INCOME DELETED SUCCESSFULLY");
+                    window.hideDeleteModal();
+                } catch (error) {
+                    console.error("Error deleting income:", error);
+                    window.showToast("ERROR DELETING INCOME");
+                }
+            };
+            
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+
+        // Update principal transaction delete function
+        window.confirmDeletePrincipalTransaction = (transactionId, transactionName) => {
+            entryToDelete = transactionId;
+            document.getElementById('delete-title').textContent = "Delete Transaction?";
+            document.getElementById('delete-message').textContent = `Are you sure you want to delete "${transactionName}"?`;
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.onclick = async () => {
+                try {
+                    // Get the transaction before deleting
+                    const transactionDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'principalTransactions', transactionId));
+                    if (!transactionDoc.exists()) {
+                        window.showToast("TRANSACTION NOT FOUND");
+                        return;
+                    }
+                    
+                    const transactionData = transactionDoc.data();
+                    
+                    // Move to deleted entries
+                    await moveToDeletedEntries('principalTransactions', transactionId, transactionData, {
+                        uid: currentUser.uid,
+                        name: userData.name,
+                        email: userData.email,
+                        role: userData.role
+                    });
+                    
+                    // Create audit log
+                    await createAuditLog('deleted', 'principal', transactionId, transactionData.purpose, {
+                        amount: transactionData.amount,
+                        date: transactionData.date,
+                        type: transactionData.type
+                    });
+                    
+                    // Delete from original collection
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'principalTransactions', transactionId));
+                    
+                    window.showToast("TRANSACTION DELETED SUCCESSFULLY");
+                    window.hideDeleteModal();
+                } catch (error) {
+                    console.error("Error deleting transaction:", error);
+                    window.showToast("ERROR DELETING TRANSACTION");
+                }
+            };
+            
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+
+        // Update income type delete function
+        window.confirmDeleteIncomeType = (typeId, typeName) => {
+            entryToDelete = typeId;
+            document.getElementById('delete-title').textContent = "Delete Income Type?";
+            document.getElementById('delete-message').textContent = `Are you sure you want to delete "${typeName}"? This will remove the income type from the system.`;
+            
+            const confirmBtn = document.getElementById('confirm-delete-btn');
+            confirmBtn.onclick = async () => {
+                try {
+                    // Get the income type before deleting
+                    const typeDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomeTypes', typeId));
+                    if (!typeDoc.exists()) {
+                        window.showToast("INCOME TYPE NOT FOUND");
+                        return;
+                    }
+                    
+                    const typeData = typeDoc.data();
+                    
+                    // Move to deleted entries
+                    await moveToDeletedEntries('incomeTypes', typeId, typeData, {
+                        uid: currentUser.uid,
+                        name: userData.name,
+                        email: userData.email,
+                        role: userData.role
+                    });
+                    
+                    // Create audit log
+                    await createAuditLog('deleted', 'income_type', typeId, typeData.name);
+                    
+                    // Delete from original collection
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomeTypes', typeId));
+                    
+                    window.showToast("INCOME TYPE DELETED SUCCESSFULLY");
+                    window.hideDeleteModal();
+                } catch (error) {
+                    console.error("Error deleting income type:", error);
+                    window.showToast("ERROR DELETING INCOME TYPE");
+                }
+            };
+            
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+
+        // Update existing create/update functions to create audit logs
+        // Example for income create/update
+        window.openIncomeModal = (editId = null) => {
+            const editData = editId ? allIncomes.find(i => i.id === editId) : null;
+            
+            document.getElementById('modal-title').textContent = editId ? "Edit Income" : "Add Income Entry";
+            document.getElementById('modal-body').innerHTML = `
+                <form id="income-form" class="space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Income Date</label>
+                        <input type="date" id="inc-date" value="${editData ? editData.date : new Date().toISOString().split('T')[0]}" class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Income Source</label>
+                        <input type="text" id="inc-source" value="${editData ? editData.source : ''}" required placeholder="e.g., Tuition Fees, Donation, etc." class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Income Type</label>
+                        <select id="inc-type" class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                            <option value="">-- SELECT INCOME TYPE --</option>
+                            ${allIncomeTypes.map(t => `<option value="${t.name}" ${editData?.type === t.name ? 'selected' : ''}>${t.name.toUpperCase()}</option>`).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount (৳)</label>
+                        <input type="number" id="inc-amount" value="${editData ? editData.amount : ''}" required placeholder="0" class="w-full bg-slate-50 rounded-2xl p-4 text-2xl font-black text-green-600 text-right border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-green-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">${editId ? 'UPDATE INCOME' : 'SAVE INCOME ENTRY'}</button>
+                </form>
+            `;
+            
+            window.openModalUI();
+            
+            document.getElementById('income-form').onsubmit = async (e) => {
+                e.preventDefault();
+                
+                const type = document.getElementById('inc-type').value;
+                if (!type) {
+                    window.showToast("PLEASE SELECT AN INCOME TYPE");
+                    return;
+                }
+                
+                const incomeData = {
+                    date: document.getElementById('inc-date').value,
+                    source: document.getElementById('inc-source').value,
+                    type: type,
+                    amount: Number(document.getElementById('inc-amount').value),
+                    userId: currentUser.uid,
+                    userName: userData.name,
+                    createdAt: editData ? editData.createdAt : serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+                
+                try {
+                    if (editId) {
+                        // Update existing income
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomes', editId), incomeData);
+                        
+                        // Create audit log for update
+                        await createAuditLog('updated', 'income', editId, incomeData.source, {
+                            oldData: editData,
+                            newData: incomeData
+                        });
+                        
+                        window.showToast("INCOME UPDATED");
+                    } else {
+                        // Add new income
+                        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'incomes'), incomeData);
+                        
+                        // Create audit log for creation
+                        await createAuditLog('created', 'income', docRef.id, incomeData.source, incomeData);
+                        
+                        window.showToast("INCOME ENTRY SAVED");
+                    }
+                    window.closeModal();
+                } catch (error) {
+                    console.error("Error saving income:", error);
+                    window.showToast("ERROR SAVING INCOME");
+                }
+            };
+        };
+
+        // Update income type create/update to include audit logs
+        window.openAddIncomeTypeModal = (editId = null) => {
+            const editData = editId ? allIncomeTypes.find(t => t.id === editId) : null;
+            document.getElementById('modal-title').textContent = editId ? "Edit Income Type" : "New Income Type";
+            document.getElementById('modal-body').innerHTML = `
+                <form id="income-type-form" class="space-y-4">
+                    <input type="text" id="it-name" value="${editData ? editData.name : ''}" placeholder="Income Type Name" required class="w-full bg-slate-50 rounded-2xl p-5 text-sm font-black ring-1 ring-slate-100 border-none outline-none">
+                    <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase shadow-xl">${editId ? 'UPDATE' : 'SAVE'}</button>
+                </form>
+            `;
+            window.openModalUI();
+            document.getElementById('income-type-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('it-name').value;
+                if(editId) {
+                    const oldData = editData;
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'incomeTypes', editId), { name });
+                    
+                    // Create audit log for update
+                    await createAuditLog('updated', 'income_type', editId, name, {
+                        oldData: oldData,
+                        newData: { name }
+                    });
+                    
+                    window.showToast("INCOME TYPE UPDATED"); 
+                } else {
+                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'incomeTypes'), { 
+                        name, 
+                        createdAt: serverTimestamp() 
+                    });
+                    
+                    // Create audit log for creation
+                    await createAuditLog('created', 'income_type', docRef.id, name, { name });
+                    
+                    window.showToast("INCOME TYPE CREATED");
+                }
+                window.closeModal();
+            };
+        };
+
+        // Update principal transaction create/update to include audit logs
+        window.openPrincipalTransactionModal = (editId = null) => {
+            const editData = editId ? allPrincipalTransactions.find(t => t.id === editId) : null;
+            
+            document.getElementById('modal-title').textContent = editId ? "Edit Principal Transaction" : "Principal Transaction";
+            document.getElementById('modal-body').innerHTML = `
+                <form id="principal-form" class="space-y-6">
+                    <!-- Form fields remain the same -->
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction Date</label>
+                        <input type="date" id="principal-date" value="${editData ? editData.date : new Date().toISOString().split('T')[0]}" class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction Type</label>
+                        <select id="principal-type" class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                            <option value="deposit" ${editData?.type === 'deposit' ? 'selected' : ''}>Deposit to Principal</option>
+                            <option value="withdrawal" ${editData?.type === 'withdrawal' ? 'selected' : ''}>Withdrawal from Principal</option>
+                        </select>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount (৳)</label>
+                        <input type="number" id="principal-amount" value="${editData ? editData.amount : ''}" required placeholder="0" class="w-full bg-slate-50 rounded-2xl p-4 text-2xl font-black ${editData?.type === 'deposit' ? 'text-green-600' : 'text-red-600'} text-right border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Purpose/Description</label>
+                        <input type="text" id="principal-purpose" value="${editData ? editData.purpose : ''}" required placeholder="e.g., Monthly deposit, Emergency withdrawal" class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Remarks (Optional)</label>
+                        <textarea id="principal-remarks" placeholder="Additional notes..." class="w-full bg-slate-50 rounded-2xl p-4 text-sm font-bold border-none outline-none ring-1 ring-slate-100 h-32">${editData ? editData.remarks || '' : ''}</textarea>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-purple-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">${editId ? 'UPDATE TRANSACTION' : 'SAVE TRANSACTION'}</button>
+                </form>
+            `;
+            
+            window.openModalUI();
+            
+            // Update amount color based on type selection
+            document.getElementById('principal-type').addEventListener('change', function() {
+                const amountField = document.getElementById('principal-amount');
+                amountField.classList.remove('text-green-600', 'text-red-600');
+                amountField.classList.add(this.value === 'deposit' ? 'text-green-600' : 'text-red-600');
+            });
+            
+            document.getElementById('principal-form').onsubmit = async (e) => {
+                e.preventDefault();
+                
+                const transactionData = {
+                    date: document.getElementById('principal-date').value,
+                    type: document.getElementById('principal-type').value,
+                    amount: Number(document.getElementById('principal-amount').value),
+                    purpose: document.getElementById('principal-purpose').value,
+                    remarks: document.getElementById('principal-remarks').value,
+                    userId: currentUser.uid,
+                    userName: userData.name,
+                    createdAt: editData ? editData.createdAt : serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                };
+                
+                try {
+                    if (editId) {
+                        // Update existing transaction
+                        const oldData = editData;
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'principalTransactions', editId), transactionData);
+                        
+                        // Create audit log for update
+                        await createAuditLog('updated', 'principal', editId, transactionData.purpose, {
+                            oldData: oldData,
+                            newData: transactionData
+                        });
+                        
+                        window.showToast("TRANSACTION UPDATED");
+                    } else {
+                        // Add new transaction
+                        const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'principalTransactions'), transactionData);
+                        
+                        // Create audit log for creation
+                        await createAuditLog('created', 'principal', docRef.id, transactionData.purpose, transactionData);
+                        
+                        window.showToast("TRANSACTION SAVED");
+                    }
+                    window.closeModal();
+                } catch (error) {
+                    console.error("Error saving principal transaction:", error);
+                    window.showToast("ERROR SAVING TRANSACTION");
+                }
+            };
+        };
+
+        // Start Data Sync - Add audit logs and deleted entries sync
+        function startDataSync() {
+            // ... existing sync code ...
+            
+            // Sync audit logs
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'auditLogs'), (s) => {
+                allAuditLogs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
+                    const timeA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                    const timeB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+                    return timeB - timeA;
+                });
+                
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(page === 'audit-log') renderAuditLog();
+                }
+            });
+            
+            // Sync deleted entries
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'deletedEntries'), (s) => {
+                allDeletedEntries = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
+                    const timeA = a.deletedAt?.toDate ? a.deletedAt.toDate() : new Date(a.deletedAt);
+                    const timeB = b.deletedAt?.toDate ? b.deletedAt.toDate() : new Date(b.deletedAt);
+                    return timeB - timeA;
+                });
+                
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(page === 'deleted-entries') renderDeletedEntries();
+                }
+            });
+            
+            // ... rest of existing sync code ...
+        }
+
+        // Scroll to top button setup
+        function setupScrollToTop() {
+            const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+            
+            // Show/hide button based on scroll position
+            window.addEventListener('scroll', () => {
+                if (window.pageYOffset > 300) {
+                    scrollToTopBtn.classList.remove('hidden');
+                } else {
+                    scrollToTopBtn.classList.add('hidden');
+                }
+            });
+            
+            // Scroll to top function
+            scrollToTopBtn.onclick = () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            };
+        }
+
+        // ... rest of existing code (renderDashboard, renderIncome, etc.) ...
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            setupScrollToTop();
+            refreshIcons();
+        });
+    </script>
+</body>
+</html>

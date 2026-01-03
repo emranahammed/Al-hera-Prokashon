@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আল হেরা প্রকাশন - ইসলামিক বইয়ের দোকান</title>
+    
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            font-family: 'Noto Sans Bengali', sans-serif;
+        }
+        
+        /* Mobile First Design */
+        @media (max-width: 640px) {
+            .book-card {
+                margin-bottom: 1.5rem;
+            }
+            
+            .book-image {
+                height: 200px;
+            }
+            
+            .nav-links {
+                flex-direction: column;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                right: 0;
+                background: white;
+                box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+                padding: 1rem;
+                transform: translateY(-100%);
+                opacity: 0;
+                transition: all 0.3s ease;
+                z-index: 40;
+            }
+            
+            .nav-links.active {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .book-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (min-width: 1025px) {
+            .book-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        /* Book Card Hover Effect */
+        .book-card {
+            transition: all 0.3s ease;
+        }
+        
+        .book-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Loading Animation */
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-50">
+        <div class="loading-spinner mb-4"></div>
+        <p class="text-xl font-semibold text-indigo-700">বইগুলি লোড হচ্ছে...</p>
+        <p class="text-gray-600 mt-2">অনুগ্রহ করে অপেক্ষা করুন</p>
+    </div>
+    
+    <!-- Navigation -->
+    <nav class="bg-gradient-to-r from-indigo-700 to-purple-800 shadow-lg fixed top-0 left-0 right-0 z-40">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="bg-white p-2 rounded-lg mr-3">
+                        <i class="fas fa-book text-indigo-600 text-xl"></i>
+                    </div>
+                    <a href="#" class="text-2xl font-bold text-white">আল হেরা প্রকাশন</a>
+                </div>
+                
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex space-x-8">
+                    <a href="#" onclick="handleNavigation(event, 'top')" class="text-white hover:text-gray-200">হোম</a>
+                    <a href="#books" onclick="handleNavigation(event, 'books')" class="text-white hover:text-gray-200">বইয়ের সংগ্রহ</a>
+                    <a href="#" onclick="handleNavigation(event, 'cart')" class="text-white hover:text-gray-200">আপনার ঝুড়ি</a>
+                    <a href="#contact" onclick="handleNavigation(event, 'contact')" class="text-white hover:text-gray-200">যোগাযোগ</a>
+                </div>
+                
+                <!-- Cart and Mobile Menu -->
+                <div class="flex items-center space-x-4">
+                    <!-- Cart -->
+                    <button id="cartBtn" class="relative">
+                        <i class="fas fa-shopping-cart text-white text-xl"></i>
+                        <span id="cartCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                    </button>
+                    
+                    <!-- Mobile Menu Button -->
+                    <button id="mobileMenuBtn" class="md:hidden text-white">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Menu -->
+        <div id="mobileMenu" class="md:hidden bg-indigo-800 px-4 pb-4 hidden">
+            <div class="space-y-2">
+                <a href="#" onclick="handleNavigation(event, 'top')" class="block text-white py-2">হোম</a>
+                <a href="#books" onclick="handleNavigation(event, 'books')" class="block text-white py-2">বইয়ের সংগ্রহ</a>
+                <a href="#" onclick="handleNavigation(event, 'cart')" class="block text-white py-2">আপনার ঝুড়ি</a>
+                <a href="#contact" onclick="handleNavigation(event, 'contact')" class="block text-white py-2">যোগাযোগ</a>
+                <a href="admin-login.html" class="block text-yellow-300 py-2">
+                    <i class="fas fa-user-shield mr-2"></i> অ্যাডমিন লগইন
+                </a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Home View Wrapper -->
+    <div id="homeView">
+    <!-- Hero Section -->
+    <div class="pt-16 bg-gradient-to-br from-indigo-50 to-purple-50">
+        <div class="max-w-7xl mx-auto px-4 py-12 md:py-20">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-6xl font-bold text-gray-800 mb-6">
+                    ইসলামিক বইয়ের <span class="text-indigo-600">বিশাল সংগ্রহ</span>
+                </h1>
+                <p class="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+                    আপনার জ্ঞান ও ইমান বৃদ্ধির জন্য নির্বাচিত ইসলামিক বই। ঘরে বসেই অর্ডার করুন।
+                </p>
+                <a href="#books" class="inline-block bg-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-300">
+                    <i class="fas fa-book-open mr-2"></i> বই ব্রাউজ করুন
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search and Filter -->
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-xl shadow-lg p-4 md:p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-4 top-3 text-gray-400"></i>
+                        <input type="text" id="searchInput" placeholder="বইয়ের নাম, লেখক বা ক্যাটাগরি অনুসন্ধান করুন..." 
+                               class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <select id="categoryFilter" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">সব ক্যাটাগরি</option>
+                        <option value="ইসলামিক">ইসলামিক</option>
+                        <option value="ইতিহাস">ইতিহাস</option>
+                        <option value="সাহিত্য">সাহিত্য</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Books Section -->
+    <div id="books" class="max-w-7xl mx-auto px-4 py-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center">আমাদের বইয়ের সংগ্রহ</h2>
+        
+        <!-- Books Grid -->
+        <div id="booksContainer" class="book-grid grid gap-6">
+            <!-- Books will be loaded here -->
+        </div>
+        
+        <!-- No Books Message -->
+        <div id="noBooksMessage" class="hidden text-center py-12">
+            <i class="fas fa-book-open text-6xl text-gray-300 mb-4"></i>
+            <h3 class="text-2xl font-bold text-gray-500 mb-2">কোন বই পাওয়া যায়নি</h3>
+            <p class="text-gray-500">আপনার অনুসন্ধানের সাথে মিলে এমন বই খুঁজে পাওয়া যায়নি</p>
+        </div>
+        
+        <!-- Loading Skeleton -->
+        <div id="loadingSkeleton" class="book-grid grid gap-6">
+            <div class="book-card bg-white rounded-lg shadow p-4">
+                <div class="bg-gray-200 h-48 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-6 mb-2 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-4 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-10 rounded animate-pulse"></div>
+            </div>
+            <div class="book-card bg-white rounded-lg shadow p-4">
+                <div class="bg-gray-200 h-48 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-6 mb-2 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-4 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-10 rounded animate-pulse"></div>
+            </div>
+            <div class="book-card bg-white rounded-lg shadow p-4">
+                <div class="bg-gray-200 h-48 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-6 mb-2 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-4 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-10 rounded animate-pulse"></div>
+            </div>
+            <div class="book-card bg-white rounded-lg shadow p-4">
+                <div class="bg-gray-200 h-48 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-6 mb-2 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-4 mb-4 rounded animate-pulse"></div>
+                <div class="bg-gray-200 h-10 rounded animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Book Details Full Page View -->
+    <div id="bookDetailsView" class="hidden pt-24 pb-12 max-w-7xl mx-auto px-4 min-h-screen fade-in">
+        <button onclick="closeBookDetails()" class="mb-6 flex items-center text-indigo-600 hover:text-indigo-800 font-semibold transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> সব বইয়ে ফিরে যান
+        </button>
+        
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2">
+                <!-- Image Side -->
+                <div class="p-6 md:p-10 bg-gray-50 flex items-center justify-center">
+                    <img id="detailBookImage" src="" alt="" class="max-h-[500px] w-auto object-contain rounded-lg shadow-lg hover:scale-105 transition-transform duration-300">
+                </div>
+                
+                <!-- Info Side -->
+                <div class="p-6 md:p-10 flex flex-col justify-center">
+                    <div class="mb-4">
+                        <span id="detailBookCategory" class="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide"></span>
+                    </div>
+                    
+                    <h1 id="detailBookTitle" class="text-3xl md:text-4xl font-bold text-gray-900 mb-2"></h1>
+                    <p class="text-lg text-gray-600 mb-6">লেখক: <span id="detailBookAuthor" class="font-medium text-gray-800"></span></p>
+                    
+                    <div class="flex items-end gap-4 mb-8">
+                        <span id="detailBookPrice" class="text-4xl font-bold text-indigo-600"></span>
+                        <span id="detailBookOriginalPrice" class="text-xl text-gray-400 line-through mb-1 hidden"></span>
+                    </div>
+                    
+                    <div class="prose text-gray-600 mb-8 leading-relaxed text-justify" id="detailBookDescription"></div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-4 mb-8">
+                        <button id="detailAddToCartBtn" class="flex-1 bg-indigo-600 text-white py-4 px-6 rounded-xl font-bold hover:bg-indigo-700 transition duration-300 shadow-lg flex items-center justify-center">
+                            <i class="fas fa-cart-plus mr-2"></i> ঝুড়িতে যোগ করুন
+                        </button>
+                        
+g                        <button id="detailReadPdfBtn" class="hidden flex-1 border-2 border-indigo-600 text-indigo-600 py-4 px-6 rounded-xl font-bold hover:bg-indigo-50 transition duration-300 flex items-center justify-center">
+                            <i class="fas fa-file-pdf mr-2"></i> পিডিএফ পড়ুন
+                        </button>
+                    </div>
+                    
+                    <!-- Share Section -->
+                    <div class="border-t border-gray-100 pt-6">
+                        <p class="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">শেয়ার করুন</p>
+                        <div class="flex gap-3">
+                            <button onclick="shareOnFacebook()" class="bg-[#1877F2] text-white px-4 py-2 rounded-lg flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm">
+                                <i class="fab fa-facebook-f mr-2"></i> ফেসবুকে শেয়ার
+                            </button>
+                            <button onclick="copyBookLink()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors shadow-sm">
+                                <i class="fas fa-link mr-2"></i> লিংক কপি
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cart Sidebar -->
+    <div id="cartSidebar" class="fixed top-0 right-0 h-full w-full md:w-96 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+        <div class="h-full flex flex-col">
+            <!-- Cart Header -->
+            <div class="p-6 border-b">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-800">আপনার ঝুড়ি</h3>
+                    <button id="closeCartBtn" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Cart Items -->
+            <div id="cartItems" class="flex-1 overflow-y-auto p-6">
+                <!-- Cart items will be loaded here -->
+                <div class="text-center py-12">
+                    <i class="fas fa-shopping-cart text-4xl text-gray-300 mb-4"></i>
+                    <p class="text-gray-500">আপনার ঝুড়ি খালি</p>
+                </div>
+            </div>
+            
+            <!-- Cart Summary -->
+            <div class="p-6 border-t bg-gray-50">
+                <div class="space-y-3 mb-6">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">সাবটোটাল:</span>
+                        <span id="cartSubtotal">৳ 0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">ডেলিভারি:</span>
+                        <span id="cartDelivery">৳ 0</span>
+                    </div>
+                    <div class="flex justify-between text-lg font-bold">
+                        <span>মোট:</span>
+                        <span id="cartTotal">৳ 0</span>
+                    </div>
+                </div>
+                
+                <button id="checkoutBtn" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    চেকআউট করুন
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- PDF Viewer Modal -->
+    <div id="pdfViewerModal" class="fixed inset-0 bg-black bg-opacity-90 hidden justify-center z-[60] px-4 pb-4 fade-in" style="padding-top: 100px;">
+        <div class="bg-white rounded-xl w-full max-w-6xl h-full flex flex-col relative shadow-2xl">
+            <!-- Header -->
+            <div class="flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-xl">
+                <div class="flex items-center">
+                    <i class="fas fa-file-pdf text-red-600 text-2xl mr-3"></i>
+                    <h3 id="pdfViewerTitle" class="text-lg font-bold text-gray-800 truncate max-w-md"></h3>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="closePdfViewer()" class="text-gray-500 hover:text-red-600 bg-gray-200 hover:bg-red-50 rounded-full p-2 w-10 h-10 flex items-center justify-center transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Viewer -->
+            <div class="flex-1 bg-gray-200 relative overflow-hidden rounded-b-xl">
+                <iframe id="pdfViewerFrame" class="w-full h-full" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-end md:items-center justify-center md:p-4 fade-in">
+        <div class="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-5xl md:rounded-2xl overflow-y-auto shadow-2xl relative">
+            <button onclick="document.getElementById('checkoutModal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-red-500 bg-gray-100 hover:bg-red-50 rounded-full p-2 w-10 h-10 flex items-center justify-center transition-all z-10">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            
+            <div class="flex flex-col lg:flex-row">
+                <!-- Order Summary Section (Left/Top) -->
+                <div class="w-full lg:w-5/12 bg-gray-50 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-gray-200">
+                    <div class="sticky top-0">
+                        <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                            <i class="fas fa-shopping-bag mr-3 text-indigo-600"></i> আপনার অর্ডার
+                        </h3>
+                        
+                        <div id="checkoutItemsList" class="space-y-4 mb-6 max-h-[40vh] lg:max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                            <!-- Items will be injected here -->
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                            <div class="flex justify-between text-gray-600">
+                                <span>সাবটোটাল</span>
+                                <span id="checkoutSubtotal" class="font-medium">৳ 0</span>
+                            </div>
+                            <div class="flex justify-between text-gray-600">
+                                <span>ডেলিভারি চার্জ</span>
+                                <span id="checkoutDelivery" class="font-medium">৳ 0</span>
+                            </div>
+                            <div class="border-t border-dashed border-gray-300 my-2"></div>
+                            <div class="flex justify-between text-lg font-bold text-gray-800">
+                                <span>সর্বমোট</span>
+                                <span id="checkoutTotal" class="text-indigo-600">৳ 0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 bg-blue-50 p-4 rounded-lg flex items-start">
+                            <i class="fas fa-info-circle text-blue-600 mt-1 mr-3"></i>
+                            <p class="text-sm text-blue-800">অর্ডার কনফার্ম করার পর আমাদের প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Customer Details Form (Right/Bottom) -->
+                <div class="w-full lg:w-7/12 p-6 md:p-8 pb-32 md:pb-8">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-2">ডেলিভারি তথ্য</h3>
+                    <p class="text-gray-500 mb-8">আপনার সঠিক তথ্য প্রদান করুন যাতে আমরা দ্রুত পণ্য পৌঁছে দিতে পারি।</p>
+                    
+                    <form id="checkoutForm" class="space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">আপনার নাম *</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                        <i class="fas fa-user"></i>
+                                    </span>
+                                    <input type="text" id="customerName" required 
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 focus:bg-white"
+                                           placeholder="আপনার পূর্ণ নাম">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">মোবাইল নম্বর *</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                        <i class="fas fa-phone"></i>
+                                    </span>
+                                    <input type="tel" id="customerPhone" required 
+                                           class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 focus:bg-white"
+                                           placeholder="017XXXXXXXX">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">ইমেইল *</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
+                                    <i class="fas fa-envelope"></i>
+                                </span>
+                                <input type="email" id="customerEmail" required 
+                                       class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 focus:bg-white"
+                                       placeholder="example@email.com">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">ঠিকানা *</label>
+                            <div class="relative">
+                                <span class="absolute top-3 left-3 text-gray-400">
+                                    <i class="fas fa-home"></i>
+                                </span>
+                                <textarea id="customerAddress" rows="3" required 
+                                          class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 focus:bg-white"
+                                          placeholder="বাসা নং, রোড নং, এলাকা, জেলা"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold hover:from-indigo-700 hover:to-purple-700 transition duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center group">
+                                <span>অর্ডার নিশ্চিত করুন</span>
+                                <i class="fas fa-check-circle ml-2 text-lg group-hover:scale-110 transition-transform"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Order Success Modal -->
+    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl w-full max-w-md">
+            <div class="p-6 text-center">
+                <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-check text-3xl text-green-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">অর্ডার সফল!</h3>
+                <p class="text-gray-600 mb-6" id="orderIdText"></p>
+                <button onclick="closeSuccessModal()" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700">
+                    ঠিক আছে
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer id="contact" class="bg-gray-800 text-white mt-12">
+        <div class="max-w-7xl mx-auto px-4 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">আল হেরা প্রকাশন</h3>
+                    <p class="text-gray-300">ইসলামিক বইয়ের এক বিশাল সংগ্রহশালা। জ্ঞান অর্জনের সুন্দর যাত্রা শুরু করুন আমাদের সাথে।</p>
+                </div>
+                
+                <div>
+                    <h3 class="text-xl font-bold mb-4">যোগাযোগ</h3>
+                    <div class="space-y-2">
+                        <p><i class="fas fa-phone mr-2"></i> +৮৮০ ১৭১২-৩৪৫৬৭৮</p>
+                        <p><i class="fas fa-envelope mr-2"></i> support@alhera.com</p>
+                        <p><i class="fas fa-map-marker-alt mr-2"></i> ঢাকা, বাংলাদেশ</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-xl font-bold mb-4">লিংক</h3>
+                    <div class="space-y-2">
+                        <a href="#" class="block text-gray-300 hover:text-white">হোম</a>
+                        <a href="#books" class="block text-gray-300 hover:text-white">বইয়ের সংগ্রহ</a>
+                        <a href="admin-login.html" class="block text-yellow-300 hover:text-yellow-400">
+                            <i class="fas fa-user-shield mr-1"></i> অ্যাডমিন লগইন
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; ২০২৫ আল হেরা প্রকাশন. সকল স্বত্ব সংরক্ষিত.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <script type="module">
+        import { books, orders, settings } from './supabase-client.js';
+        
+        // Global variables
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let allBooks = [];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Load books
+            await loadBooks();
+            
+            // Update cart count
+            updateCartCount();
+            
+            // Check for hash in URL to load specific book
+            if (window.location.hash.startsWith('#book=')) {
+                const bookId = parseInt(window.location.hash.split('=')[1]);
+                if (bookId) {
+                    setTimeout(() => showBookDetails(bookId), 500); // Small delay to ensure books are loaded
+                }
+            }
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Hide loading
+            setTimeout(() => {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('loadingSkeleton').style.display = 'none';
+            }, 1000);
+        });
+        
+        // Load books from database
+        async function loadBooks() {
+            try {
+                const result = await books.getAll();
+                
+                if (result.success) {
+                    allBooks = result.data;
+                    displayBooks(allBooks);
+                } else {
+                    showError('বই লোড করতে সমস্যা হয়েছে');
+                }
+            } catch (error) {
+                console.error('Error loading books:', error);
+                showError('বই লোড করতে সমস্যা হয়েছে');
+            }
+        }
+        
+        // Display books
+        function displayBooks(books) {
+            const container = document.getElementById('booksContainer');
+            const noBooksMessage = document.getElementById('noBooksMessage');
+            
+            if (books.length === 0) {
+                container.innerHTML = '';
+                noBooksMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noBooksMessage.classList.add('hidden');
+            
+            let booksHtml = '';
+            
+            books.forEach(book => {
+                const discount = book.original_price && book.original_price > book.price 
+                    ? Math.round(((book.original_price - book.price) / book.original_price) * 100) 
+                    : 0;
+                
+                booksHtml += `
+                    <div class="book-card bg-white rounded-xl shadow p-4 fade-in">
+                        <div class="relative mb-4 cursor-pointer group" onclick="showBookDetails(${book.id})">
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg"></div>
+                            <img src="${book.image}" alt="${book.title}" 
+                                 class="book-image w-full h-48 object-cover rounded-lg">
+                            
+                            ${discount > 0 ? `
+                                <div class="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-sm">
+                                    ${discount}% ছাড়
+                                </div>
+                            ` : ''}
+                            
+                            ${book.pdf_url ? `
+                                <div class="absolute bottom-2 right-2 bg-indigo-600 text-white px-2 py-1 rounded text-xs shadow-md flex items-center">
+                                    <i class="fas fa-file-pdf mr-1"></i> PDF
+                                </div>
+                            ` : ''}
+                            
+                            ${book.is_bestseller ? `
+                                <div class="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-sm">
+                                    বেস্টসেলার
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <h3 class="font-bold text-gray-800 text-lg mb-2">${book.title}</h3>
+                        <p class="text-gray-600 text-sm mb-2">লেখক: ${book.author}</p>
+                        <p class="text-gray-700 mb-4 text-sm line-clamp-2">${book.description}</p>
+                        
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-xl font-bold text-indigo-600">৳ ${book.price}</span>
+                                ${book.original_price && book.original_price > book.price ? 
+                                    `<span class="text-sm text-gray-500 line-through ml-2">৳ ${book.original_price}</span>` : ''}
+                            </div>
+                            
+                            <button onclick="addToCart(${book.id})" 
+                                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition duration-300">
+                                <i class="fas fa-cart-plus mr-2"></i> যোগ করুন
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = booksHtml;
+        }
+        
+        // Cart functions
+        window.addToCart = function(bookId) {
+            const book = allBooks.find(b => b.id === bookId);
+            if (!book) return;
+            
+            const existingItem = cart.find(item => item.id === bookId);
+            
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    id: book.id,
+                    title: book.title,
+                    price: book.price,
+                    image: book.image,
+                    quantity: 1
+                });
+            }
+            
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartCount();
+            
+            // Show notification
+            showNotification(`${book.title} ঝুড়িতে যোগ করা হয়েছে!`);
+        };
+        
+        function updateCartCount() {
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('cartCount').textContent = totalItems;
+        }
+        
+        function showCart() {
+            const cartSidebar = document.getElementById('cartSidebar');
+            const cartItems = document.getElementById('cartItems');
+            
+            if (cart.length === 0) {
+                cartItems.innerHTML = `
+                    <div class="text-center py-12">
+                        <i class="fas fa-shopping-cart text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">আপনার ঝুড়ি খালি</p>
+                    </div>
+                `;
+            } else {
+                let itemsHtml = '';
+                let subtotal = 0;
+                
+                cart.forEach((item, index) => {
+                    const itemTotal = item.price * item.quantity;
+                    subtotal += itemTotal;
+                    
+                    itemsHtml += `
+                        <div class="flex items-center mb-4 p-3 bg-white rounded-lg border">
+                            <img src="${item.image}" alt="${item.title}" 
+                                 class="w-16 h-20 object-cover rounded mr-4">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800">${item.title}</h4>
+                                <p class="text-gray-600 text-sm">৳ ${item.price} x ${item.quantity}</p>
+                                <p class="font-bold text-indigo-600">৳ ${itemTotal}</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="updateQuantity(${index}, ${item.quantity - 1})" 
+                                        class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-minus text-sm"></i>
+                                </button>
+                                <span class="font-semibold">${item.quantity}</span>
+                                <button onclick="updateQuantity(${index}, ${item.quantity + 1})" 
+                                        class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-plus text-sm"></i>
+                                </button>
+                                <button onclick="removeFromCart(${index})" 
+                                        class="w-8 h-8 bg-red-100 text-red-600 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-trash text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                cartItems.innerHTML = itemsHtml;
+                
+                // Calculate delivery
+                const deliveryCharge = subtotal >= 500 ? 0 : 60;
+                const total = subtotal + deliveryCharge;
+                
+                // Update summary
+                document.getElementById('cartSubtotal').textContent = `৳ ${subtotal}`;
+                document.getElementById('cartDelivery').textContent = `৳ ${deliveryCharge}`;
+                document.getElementById('cartTotal').textContent = `৳ ${total}`;
+                
+                // Enable/disable checkout button
+                const checkoutBtn = document.getElementById('checkoutBtn');
+                checkoutBtn.disabled = cart.length === 0;
+            }
+            
+            cartSidebar.style.transform = 'translateX(0)';
+        }
+        
+        window.updateQuantity = function(index, newQuantity) {
+            if (newQuantity < 1) {
+                removeFromCart(index);
+                return;
+            }
+            
+            cart[index].quantity = newQuantity;
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartCount();
+            showCart();
+        };
+        
+        window.removeFromCart = function(index) {
+            cart.splice(index, 1);
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCartCount();
+            showCart();
+        };
+        
+        // Checkout
+        document.getElementById('checkoutForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('customerName').value;
+            const phone = document.getElementById('customerPhone').value;
+            const email = document.getElementById('customerEmail').value;
+            const address = document.getElementById('customerAddress').value;
+            
+            // Calculate total
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const deliveryCharge = subtotal >= 500 ? 0 : 60;
+            const total = subtotal + deliveryCharge;
+            
+            const orderData = {
+                customer_name: name,
+                customer_phone: phone,
+                customer_email: email,
+                customer_address: address,
+                items: cart,
+                total_amount: total,
+                delivery_charge: deliveryCharge,
+                payment_method: 'ক্যাশ অন ডেলিভারি'
+            };
+            
+            try {
+                const result = await orders.create(orderData);
+                
+                if (result.success) {
+                    // Clear cart
+                    cart = [];
+                    localStorage.setItem('cart', JSON.stringify(cart));
+                    updateCartCount();
+                    
+                    // Show success modal
+                    document.getElementById('orderIdText').textContent = 
+                        `আপনার অর্ডার আইডি: ${result.data.order_id}`;
+                    document.getElementById('successModal').classList.remove('hidden');
+                    
+                    // Close modals
+                    document.getElementById('checkoutModal').classList.add('hidden');
+                    closeCart();
+                } else {
+                    showError('অর্ডার করতে সমস্যা হয়েছে');
+                }
+            } catch (error) {
+                showError('অর্ডার করতে সমস্যা হয়েছে');
+            }
+        });
+        
+        // Helper functions
+        function setupEventListeners() {
+            // Cart buttons
+            document.getElementById('cartBtn').addEventListener('click', showCart);
+            document.getElementById('closeCartBtn').addEventListener('click', closeCart);
+            
+            // Checkout button
+            document.getElementById('checkoutBtn').addEventListener('click', openCheckoutModal);
+            
+            // Mobile menu
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                const menu = document.getElementById('mobileMenu');
+                menu.classList.toggle('hidden');
+            });
+            
+            // Search and filter
+            document.getElementById('searchInput').addEventListener('input', filterBooks);
+            document.getElementById('categoryFilter').addEventListener('change', filterBooks);
+        }
+        
+        function filterBooks() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+            
+            const filtered = allBooks.filter(book => {
+                const matchesSearch = searchTerm === '' || 
+                    book.title.toLowerCase().includes(searchTerm) ||
+                    book.author.toLowerCase().includes(searchTerm) ||
+                    book.description.toLowerCase().includes(searchTerm);
+                
+                const matchesCategory = category === '' || book.category === category;
+                
+                return matchesSearch && matchesCategory;
+            });
+            
+            displayBooks(filtered);
+        }
+        
+        function closeCart() {
+            document.getElementById('cartSidebar').style.transform = 'translateX(100%)';
+        }
+        
+        window.closeSuccessModal = function() {
+            document.getElementById('successModal').classList.add('hidden');
+        };
+        
+        // Open Checkout Modal with Data
+        window.openCheckoutModal = function() {
+            if (cart.length === 0) return;
+            
+            const itemsList = document.getElementById('checkoutItemsList');
+            let itemsHtml = '';
+            let subtotal = 0;
+            
+            cart.forEach(item => {
+                const itemTotal = item.price * item.quantity;
+                subtotal += itemTotal;
+                
+                itemsHtml += `
+                    <div class="flex items-center space-x-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                        <div class="relative w-16 h-20 flex-shrink-0">
+                            <img src="${item.image}" alt="${item.title}" class="w-full h-full object-cover rounded-lg">
+                            <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                                ${item.quantity}
+                            </span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-bold text-gray-800 line-clamp-2" title="${item.title}">${item.title}</h4>
+                            <p class="text-xs text-gray-500 mt-1">৳ ${item.price} x ${item.quantity}</p>
+                        </div>
+                        <div class="font-bold text-indigo-600 text-sm">
+                            ৳ ${itemTotal}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            itemsList.innerHTML = itemsHtml;
+            
+            const deliveryCharge = subtotal >= 500 ? 0 : 60;
+            const total = subtotal + deliveryCharge;
+            
+            document.getElementById('checkoutSubtotal').textContent = `৳ ${subtotal}`;
+            document.getElementById('checkoutDelivery').textContent = `৳ ${deliveryCharge}`;
+            document.getElementById('checkoutTotal').textContent = `৳ ${total}`;
+            
+            document.getElementById('checkoutModal').classList.remove('hidden');
+        };
+        
+        // Book Details Full Page Functions
+        window.showBookDetails = function(bookId) {
+            const book = allBooks.find(b => b.id === bookId);
+            if (!book) return;
+
+            // Populate details
+            document.getElementById('detailBookTitle').textContent = book.title;
+            document.getElementById('detailBookAuthor').textContent = book.author;
+            document.getElementById('detailBookCategory').textContent = book.category;
+            document.getElementById('detailBookPrice').textContent = `৳ ${book.price}`;
+            
+            const originalPriceEl = document.getElementById('detailBookOriginalPrice');
+            if (book.original_price && book.original_price > book.price) {
+                originalPriceEl.textContent = `৳ ${book.original_price}`;
+                originalPriceEl.classList.remove('hidden');
+            } else {
+                originalPriceEl.classList.add('hidden');
+            }
+            
+            document.getElementById('detailBookDescription').textContent = book.description;
+            document.getElementById('detailBookImage').src = book.image;
+            
+            // Setup Add to Cart button
+            document.getElementById('detailAddToCartBtn').onclick = function() {
+                addToCart(book.id);
+                showNotification(`${book.title} ঝুড়িতে যোগ করা হয়েছে!`);
+            };
+            
+            // Setup PDF button
+            const pdfBtn = document.getElementById('detailReadPdfBtn');
+            if (book.pdf_url) {
+                pdfBtn.onclick = function() {
+                    openPdfViewer(book.title, book.pdf_url);
+                };
+                pdfBtn.classList.remove('hidden');
+            } else {
+                pdfBtn.classList.add('hidden');
+            }
+            
+            // Switch Views
+            document.getElementById('homeView').classList.add('hidden');
+            document.getElementById('bookDetailsView').classList.remove('hidden');
+            
+            // Update URL hash for sharing
+            window.location.hash = `book=${bookId}`;
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        };
+
+        window.closeBookDetails = function() {
+            document.getElementById('homeView').classList.remove('hidden');
+            document.getElementById('bookDetailsView').classList.add('hidden');
+            
+            // Clear hash
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        };
+        
+        // PDF Viewer Functions
+        window.openPdfViewer = function(title, url) {
+            document.getElementById('pdfViewerTitle').textContent = title;
+            // Hide toolbar to prevent easy download
+            document.getElementById('pdfViewerFrame').src = url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+            
+            const modal = document.getElementById('pdfViewerModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closePdfViewer = function() {
+            const modal = document.getElementById('pdfViewerModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('pdfViewerFrame').src = '';
+        };
+        
+        // Navigation Handler
+        window.handleNavigation = function(event, sectionId) {
+            event.preventDefault();
+            
+            // Ensure Home View is visible
+            document.getElementById('homeView').classList.remove('hidden');
+            document.getElementById('bookDetailsView').classList.add('hidden');
+            
+            // Clear hash if it was a book
+            if (window.location.hash.startsWith('#book=')) {
+                history.pushState("", document.title, window.location.pathname + window.location.search);
+            }
+
+            if (sectionId === 'top') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (sectionId === 'cart') {
+                showCart();
+            } else {
+                const element = document.getElementById(sectionId);
+                if (element) {
+                    // Account for fixed header
+                    const headerOffset = 80;
+                    const elementPosition = element.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+            
+            // Close mobile menu if open
+            document.getElementById('mobileMenu').classList.add('hidden');
+        };
+        
+        // Share Functions
+        window.shareOnFacebook = function() {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+        };
+        
+        window.copyBookLink = function() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                showNotification('লিংক কপি করা হয়েছে!');
+            }).catch(err => {
+                console.error('Could not copy text: ', err);
+            });
+        };
+
+        function showNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in';
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        function showError(message) {
+            // Create error notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 fade-in';
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                if (targetId === '#') return;
+                
+                const targetElement = document.querySelector(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
