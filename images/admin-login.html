@@ -151,12 +151,7 @@
             </div>
         </div>
         
-        <!-- Setup Database -->
-        <div class="mt-6 text-center">
-            <button onclick="setupDatabase()" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
-                <i class="fas fa-database mr-1"></i> ডাটাবেস সেটআপ করুন
-            </button>
-        </div>
+
     </div>
     
     <!-- Loading Overlay -->
@@ -174,53 +169,17 @@
         import { auth, supabase } from './supabase-client.js';
         
         // Check if already logged in
-        if (auth.isAdminLoggedIn()) {
-            window.location.href = 'admin-panel.html';
-        }
+        (async () => {
+            if (await auth.isAdminLoggedIn()) {
+                window.location.href = 'admin-panel.html';
+            }
+        })();
         
         // Toggle password visibility
         window.togglePassword = function() {
             const passwordInput = document.getElementById('password');
             const type = passwordInput.type === 'password' ? 'text' : 'password';
             passwordInput.type = type;
-        };
-        
-        // Setup database
-        window.setupDatabase = async function() {
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            const loadingText = document.getElementById('loadingText');
-            
-            loadingText.textContent = 'ডাটাবেস সেটআপ হচ্ছে...';
-            loadingOverlay.classList.remove('hidden');
-            
-            try {
-                // Create admin if not exists
-                const { error } = await supabase
-                    .from('admins')
-                    .insert([{
-                        email: 'admin@alhera.com',
-                        password: 'Admin@123',
-                        name: 'সুপার অ্যাডমিন',
-                        role: 'super_admin',
-                        created_at: new Date().toISOString()
-                    }]);
-                
-                if (error && !error.message.includes('duplicate')) {
-                    throw error;
-                }
-                
-                showMessage('success', 'ডাটাবেস সফলভাবে সেটআপ হয়েছে! এখন লগইন করুন।');
-                
-                // Auto-fill form
-                document.getElementById('email').value = 'admin@alhera.com';
-                document.getElementById('password').value = 'Admin@123';
-                
-            } catch (error) {
-                console.error('Setup error:', error);
-                showMessage('error', 'সেটআপে ত্রুটি: ' + error.message);
-            } finally {
-                loadingOverlay.classList.add('hidden');
-            }
         };
         
         // Form submission
