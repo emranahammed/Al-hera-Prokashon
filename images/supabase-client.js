@@ -31,52 +31,93 @@ const storage = {
 const auth = {
     async loginAdmin(email, password) {
         try {
-            const { data, error } = await supabase
-                .from(DB_TABLES.ADMINS)
-                .select('*')
-                .eq('email', email)
-                .eq('password', password)
-                .single();
+            // Sign in using Supabase Auth
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-            if (error) {
-                console.error('Login error:', error);
-                return { success: false, message: 'ডাটাবেস ত্রুটি' };
+            if (authError) {
+                console.error('Authentication error:', authError);
+                return { success: false, message: 'ভুল ইমেইল বা পাসওয়ার্ড' };
             }
 
-            if (data) {
+            if (authData.user) {
+                // Fetch admin profile from the 'admins' table
+                const { data: adminData, error: profileError } = await supabase
+                    .from(DB_TABLES.ADMINS)
+                    .select('id, name, role')
+                    .eq('email', email)
+                    .single();
+
+                if (profileError) {
+                    console.error('Profile fetch error:', profileError);
+                    // Log out the user if profile not found
+                    await supabase.auth.signOut();
+                    return { success: false, message: 'অ্যাডমিন প্রোফাইল পাওয়া যায়নি' };
+                }
+
+                // Store admin details in local storage
                 storage.set('admin', {
-                    id: data.id,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role,
+                    id: adminData.id,
+                    email: authData.user.email,
+                    name: adminData.name,
+                    role: adminData.role,
                     loginTime: Date.now()
                 });
                 storage.set('isAdminLoggedIn', true);
-                return { success: true, data };
+                
+                return { success: true, data: { ...authData.user, ...adminData } };
             }
 
-            return { success: false, message: 'ভুল ইমেইল বা পাসওয়ার্ড' };
+            return { success: false, message: 'অজানা একটি ত্রুটি ঘটেছে' };
         } catch (error) {
+            console.error('Login process error:', error);
             return { success: false, message: 'লগইন প্রক্রিয়ায় ত্রুটি' };
         }
     },
 
-    isAdminLoggedIn() {
+    async isAdminLoggedIn() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            storage.remove('admin');
+            storage.remove('isAdminLoggedIn');
+            return false;
+        }
+
         const admin = storage.get('admin');
-        const isLoggedIn = storage.get('isAdminLoggedIn');
+        if (!admin) {
+            const { data: adminData, error } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .select('id, name, role')
+                .eq('email', session.user.email)
+                .single();
+            
+            if (error) {
+                console.error("Failed to refetch admin profile", error);
+                await this.logoutAdmin();
+                return false;
+            }
+
+            storage.set('admin', {
+                id: adminData.id,
+                email: session.user.email,
+                name: adminData.name,
+                role: adminData.role,
+                loginTime: Date.now()
+            });
+        }
         
-        if (!admin || !isLoggedIn) return false;
-        
-        // Check if session is valid (24 hours)
-        const sessionAge = Date.now() - admin.loginTime;
-        return sessionAge < (24 * 60 * 60 * 1000);
+        storage.set('isAdminLoggedIn', true);
+        return true;
     },
 
     getCurrentAdmin() {
         return storage.get('admin');
     },
 
-    logoutAdmin() {
+    async logoutAdmin() {
+        await supabase.auth.signOut();
         storage.remove('admin');
         storage.remove('isAdminLoggedIn');
         window.location.href = 'admin-login.html';
@@ -262,6 +303,39 @@ const orders = {
         }
     },
 
+    async getById(id) {
+        try {
+            const { data, error } = await supabase
+                .from(DB_TABLES.ORDERS)
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    },
+
+    async update(id, orderData) {
+        try {
+            const { data, error } = await supabase
+                .from(DB_TABLES.ORDERS)
+                .update({
+                    ...orderData,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    },
+
     async updateStatus(id, status) {
         try {
             const { data, error } = await supabase
@@ -335,6 +409,113 @@ const stats = {
     }
 };
 
+// Admins Functions
+const admins = {
+    async getAll() {
+        try {
+            const { data, error } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    },
+
+    async create(adminData) {
+        try {
+            // IMPORTANT: This requires a service_role key to be used securely, typically from a backend.
+            // Exposing admin user creation on the client-side is a security risk.
+            // The following code assumes it's being run in a secure environment.
+            
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email: adminData.email,
+                password: adminData.password,
+                email_confirm: true, // Auto-confirm email
+            });
+
+            if (authError) {
+                if (authError.message.includes("User already registered")) {
+                    return { success: false, message: "এই ইমেইল দিয়ে ஏற்கனவே একজন ব্যবহারকারী আছেন।" };
+                }
+                throw authError;
+            }
+
+            // Then, insert the profile into the 'admins' table
+            const profileData = {
+                email: adminData.email,
+                name: adminData.name,
+                role: adminData.role,
+                created_at: new Date().toISOString()
+                // If your 'admins' table has a foreign key to auth.users, you'd link it here.
+                // e.g., user_id: authData.user.id
+            };
+
+            const { data, error } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .insert([profileData])
+                .select();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    },
+
+    async update(id, adminData) {
+        try {
+            const { data, error } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .update(adminData)
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    },
+
+    async delete(id) {
+        try {
+            // As with create, this is a sensitive operation.
+            // Deleting a user requires the service_role key.
+            
+            // First get the user's email to identify them in auth
+            const { data: adminToDelete, error: getError } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .select('email')
+                .eq('id', id)
+                .single();
+
+            if (getError) throw getError;
+            
+            // This is a placeholder. You can't get a user's ID from their email on the client-side securely.
+            // To properly delete, you need the user's UID from auth.users, which you'd have if your
+            // 'admins' table linked to it. For now, we will only delete from the 'admins' table.
+            
+            const { error: deleteError } = await supabase
+                .from(DB_TABLES.ADMINS)
+                .delete()
+                .eq('id', id);
+
+            if (deleteError) throw deleteError;
+
+            // The next line would be: await supabase.auth.admin.deleteUser(auth_user_id);
+            // But we cannot do this securely from the client.
+
+            return { success: true };
+        } catch (error) {
+            return { success: false, message: error.message };
+        }
+    }
+};
+
 // Initialize Database
 async function initDatabase() {
     try {
@@ -345,10 +526,10 @@ async function initDatabase() {
             .limit(1);
 
         if (!admins || admins.length === 0) {
-            // Create initial admin
+            // Create initial admin profile (not the user)
+            // The user must be created in Supabase Auth separately
             await supabase.from(DB_TABLES.ADMINS).insert([{
                 email: INITIAL_ADMIN.email,
-                password: INITIAL_ADMIN.password,
                 name: INITIAL_ADMIN.name,
                 role: 'super_admin',
                 created_at: new Date().toISOString()
@@ -384,4 +565,4 @@ async function initDatabase() {
 // Call initialization
 initDatabase();
 
-export { supabase, auth, books, categories, orders, settings, stats };
+export { supabase, auth, books, categories, orders, settings, stats, admins };

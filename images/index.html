@@ -803,10 +803,12 @@ g                        <button id="detailReadPdfBtn" class="hidden flex-1 bord
             const total = subtotal + deliveryCharge;
             
             const orderData = {
-                customer_name: name,
-                customer_phone: phone,
-                customer_email: email,
-                customer_address: address,
+                customer_details: {
+                    name: name,
+                    phone: phone,
+                    email: email,
+                    address: address
+                },
                 items: cart,
                 total_amount: total,
                 delivery_charge: deliveryCharge,

@@ -250,6 +250,11 @@
                     <span>সেটিংস</span>
                 </a>
                 
+                <a href="#" onclick="loadPage('users')" id="userManagementLink" class="nav-item flex items-center p-3 rounded-lg hover:bg-indigo-700 transition duration-200" style="display: none;">
+                    <i class="fas fa-users-cog w-6 mr-3"></i>
+                    <span>ব্যবহারকারী</span>
+                </a>
+
                 <a href="#" onclick="logout()" class="nav-item flex items-center p-3 rounded-lg hover:bg-red-700 transition duration-200 mt-8">
                     <i class="fas fa-sign-out-alt w-6 mr-3"></i>
                     <span>লগআউট</span>
@@ -508,13 +513,64 @@
             </div>
         </div>
     </div>
+
+    <!-- User Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content mx-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800" id="userModalTitle">নতুন ব্যবহারকারী যোগ করুন</h3>
+                    <button onclick="closeUserModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="userForm" class="space-y-4">
+                    <input type="hidden" id="userId">
+                    
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">নাম *</label>
+                        <input type="text" id="userName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">ইমেইল *</label>
+                        <input type="email" id="userEmail" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <div id="password-field">
+                        <label class="block text-gray-700 font-medium mb-2">পাসওয়ার্ড *</label>
+                        <input type="password" id="userPassword" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">ভূমিকা *</label>
+                        <select id="userRole" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="super_admin">Super Admin</option>
+                            <option value="admin">Admin</option>
+                            <option value="editor">Editor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4 pt-6">
+                        <button type="button" onclick="closeUserModal()" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            বাতিল করুন
+                        </button>
+                        <button type="submit" id="saveUserBtn" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            সংরক্ষণ করুন
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     
     <!-- jQuery and DataTables -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     
     <script type="module">
-        import { auth, books, categories, orders, stats, settings } from './supabase-client.js';
+        import { auth, books, categories, orders, stats, settings, admins } from './supabase-client.js';
         
         // Global variables
         let currentPage = 'dashboard';
@@ -522,85 +578,123 @@
         let confirmData = null;
         let dataTable = null;
         let loadedOrders = [];
-        
-        // Check authentication
-        if (!auth.isAdminLoggedIn()) {
-            window.location.href = 'admin-login.html';
+        let currentAdmin = null;
+
+        // RBAC function
+        function applyRBAC() {
+            if (!currentAdmin) return;
+
+            const role = currentAdmin.role;
+            const isSuperAdmin = role === 'super_admin';
+            const isAdmin = role === 'admin';
+            const isEditor = role === 'editor';
+
+            // Hide all elements that require a specific role by default
+            document.querySelectorAll('.requires-super-admin, .requires-admin, .requires-editor').forEach(el => {
+                el.style.display = 'none';
+            });
+
+            // Show elements based on the user's role
+            if (isSuperAdmin) {
+                document.querySelectorAll('.requires-super-admin, .requires-admin, .requires-editor').forEach(el => {
+                    el.style.display = 'inline-block';
+                });
+            } else if (isAdmin) {
+                document.querySelectorAll('.requires-admin, .requires-editor').forEach(el => {
+                    el.style.display = 'inline-block';
+                });
+            } else if (isEditor) {
+                document.querySelectorAll('.requires-editor').forEach(el => {
+                    el.style.display = 'inline-block';
+                });
+            }
+
+            // Handle nav links separately as they are flex items
+            if (isSuperAdmin) {
+                document.getElementById('userManagementLink').style.display = 'flex';
+                document.querySelector('a[onclick*="loadPage(\'settings\')"]').style.display = 'flex';
+            } else if (isAdmin) {
+                 document.getElementById('userManagementLink').style.display = 'none';
+                 document.querySelector('a[onclick*="loadPage(\'settings\')"]').style.display = 'flex';
+            } else if (isEditor) {
+                document.getElementById('userManagementLink').style.display = 'none';
+                document.querySelector('a[onclick*="loadPage(\'settings\')"]').style.display = 'none';
+            }
         }
         
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set admin name
-            const admin = auth.getCurrentAdmin();
-            if (admin) {
-                document.getElementById('adminName').textContent = admin.name;
+        // --- INITIALIZATION ---
+        (async () => {
+            const loggedIn = await auth.isAdminLoggedIn();
+            if (!loggedIn) {
+                window.location.href = 'admin-login.html';
+                return;
             }
             
-            // Update datetime
+            currentAdmin = auth.getCurrentAdmin();
+            
+            if (currentAdmin) {
+                document.getElementById('adminName').textContent = currentAdmin.name;
+            }
+            
             updateDateTime();
             setInterval(updateDateTime, 1000);
             
-            // Load initial page
-            loadPage('dashboard');
+            await loadPage('dashboard');
             
-            // Setup sidebar toggle
+            // Event Listeners
             document.getElementById('mobileMenuToggle').addEventListener('click', () => {
                 document.getElementById('sidebar').classList.add('mobile-open');
                 document.getElementById('mobileOverlay').classList.add('active');
             });
-            
             document.getElementById('sidebarToggle').addEventListener('click', closeSidebar);
             document.getElementById('mobileOverlay').addEventListener('click', closeSidebar);
-            
-            // Close sidebar on nav item click (mobile)
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.addEventListener('click', closeSidebar);
-            });
-        });
-        
+            document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', closeSidebar));
+            document.getElementById('bookForm').addEventListener('submit', onBookFormSubmit);
+            document.getElementById('orderForm').addEventListener('submit', onOrderFormSubmit);
+            document.getElementById('userForm').addEventListener('submit', onUserFormSubmit);
+        })();
+
+        // --- HELPERS ---
         function updateDateTime() {
-            const now = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            };
-            document.getElementById('currentDateTime').textContent = 
-                now.toLocaleDateString('bn-BD', options);
+             const now = new Date();
+             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+             document.getElementById('currentDateTime').textContent = now.toLocaleDateString('bn-BD', options);
         }
-        
+
         function closeSidebar() {
             document.getElementById('sidebar').classList.remove('mobile-open');
             document.getElementById('mobileOverlay').classList.remove('active');
         }
-        
-        // Page loading functions
+
+        window.showLoading = function() { document.getElementById('loadingOverlay').classList.remove('hidden'); };
+        window.hideLoading = function() { document.getElementById('loadingOverlay').classList.add('hidden'); };
+        window.showMessage = function(type, text) {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} fade-in`;
+            toast.innerHTML = `<div class="flex items-center"><i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i><span>${text}</span></div>`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => { if (toast.parentNode) { toast.parentNode.removeChild(toast); } }, 300);
+            }, 3000);
+        };
+        window.showError = function(message) { showMessage('error', message); };
+
+        // --- PAGE LOADING ---
         window.loadPage = async function(page) {
             currentPage = page;
             document.getElementById('pageTitle').textContent = getPageTitle(page);
             showLoading();
-            
             try {
                 switch(page) {
-                    case 'dashboard':
-                        await loadDashboard();
-                        break;
-                    case 'books':
-                        await loadBooks();
-                        break;
-                    case 'categories':
-                        await loadCategories();
-                        break;
-                    case 'orders':
-                        await loadOrders();
-                        break;
-                    case 'settings':
-                        await loadSettings();
-                        break;
+                    case 'dashboard': await loadDashboard(); break;
+                    case 'books': await loadBooks(); break;
+                    case 'categories': await loadCategories(); break;
+                    case 'orders': await loadOrders(); break;
+                    case 'settings': await loadSettings(); break;
+                    case 'users': await loadUsers(); break;
                 }
+                applyRBAC();
             } catch (error) {
                 console.error('Error loading page:', error);
                 showError('পেজ লোড করতে সমস্যা হয়েছে');
@@ -608,861 +702,734 @@
                 hideLoading();
             }
         };
-        
+
         function getPageTitle(page) {
-            const titles = {
-                'dashboard': 'ড্যাশবোর্ড',
-                'books': 'বই ম্যানেজমেন্ট',
-                'categories': 'ক্যাটাগরি',
-                'orders': 'অর্ডার ম্যানেজমেন্ট',
-                'settings': 'সেটিংস'
-            };
+            const titles = { 'dashboard': 'ড্যাশবোর্ড', 'books': 'বই ম্যানেজমেন্ট', 'categories': 'ক্যাটাগরি', 'orders': 'অর্ডার ম্যানেজমেন্ট', 'settings': 'সেটিংস', 'users': 'ব্যবহারকারী ম্যানেজমেন্ট' };
             return titles[page] || 'ড্যাশবোর্ড';
         }
-        
-        // Dashboard
-        async function loadDashboard() {
-            // Fetch both stats and orders for detailed calculation
-            const [statsResult, ordersResult] = await Promise.all([
-                stats.getDashboardStats(),
-                orders.getAll()
-            ]);
+
+        // --- CONTENT LOADERS ---
+                async function loadDashboard() {
+            const contentArea = document.getElementById('contentArea');
             
-            if (statsResult.success && ordersResult.success) {
-                const data = statsResult.data;
-                const allOrders = ordersResult.data;
-                
-                // Calculate Today's Stats
-                const today = new Date().toISOString().split('T')[0];
-                const todayOrders = allOrders.filter(order => 
-                    new Date(order.created_at).toISOString().split('T')[0] === today
-                );
-                
-                const todayRevenue = todayOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
-                const pendingOrders = allOrders.filter(order => order.status === 'pending').length;
-                
-                // Recent 5 orders
-                const recentOrders = [...allOrders]
-                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                    .slice(0, 5);
+            const statsRes = await stats.getDashboardStats();
+            if (!statsRes.success) {
+                contentArea.innerHTML = `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <strong class="font-bold">ত্রুটি!</strong>
+                    <span class="block sm:inline">ড্যাশবোর্ড ডেটা লোড করা যায়নি।</span>
+                </div>`;
+                return;
+            }
 
-                const content = `
-                    <div class="fade-in">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">ড্যাশবোর্ড ওভারভিউ</h2>
-                        
-                        <!-- Summary Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                            <div class="stat-card bg-white p-6 rounded-xl shadow border-l-4 border-blue-500">
-                                <div class="flex items-center">
-                                    <div class="bg-blue-100 p-3 rounded-lg mr-4">
-                                        <i class="fas fa-book text-2xl text-blue-600"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 text-sm">মোট বই</p>
-                                        <p class="text-2xl font-bold text-gray-800">${data.totalBooks}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="stat-card bg-white p-6 rounded-xl shadow border-l-4 border-green-500">
-                                <div class="flex items-center">
-                                    <div class="bg-green-100 p-3 rounded-lg mr-4">
-                                        <i class="fas fa-shopping-cart text-2xl text-green-600"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 text-sm">মোট অর্ডার</p>
-                                        <p class="text-2xl font-bold text-gray-800">${data.totalOrders}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="stat-card bg-white p-6 rounded-xl shadow border-l-4 border-purple-500">
-                                <div class="flex items-center">
-                                    <div class="bg-purple-100 p-3 rounded-lg mr-4">
-                                        <i class="fas fa-money-bill-wave text-2xl text-purple-600"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 text-sm">মোট আয়</p>
-                                        <p class="text-2xl font-bold text-gray-800">৳ ${data.totalRevenue.toFixed(0)}</p>
-                                    </div>
-                                </div>
-                            </div>
+            const { totalBooks, totalOrders, totalRevenue } = statsRes.data;
 
-                            <div class="stat-card bg-white p-6 rounded-xl shadow border-l-4 border-yellow-500">
-                                <div class="flex items-center">
-                                    <div class="bg-yellow-100 p-3 rounded-lg mr-4">
-                                        <i class="fas fa-clock text-2xl text-yellow-600"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-gray-600 text-sm">পেন্ডিং অর্ডার</p>
-                                        <p class="text-2xl font-bold text-gray-800">${pendingOrders}</p>
-                                    </div>
-                                </div>
-                            </div>
+            contentArea.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in">
+                    <!-- Total Books -->
+                    <div class="stat-card bg-white p-6 rounded-xl shadow-md flex items-center">
+                        <div class="bg-indigo-100 p-4 rounded-full mr-4">
+                            <i class="fas fa-book text-3xl text-indigo-600"></i>
                         </div>
-                        
-                        <!-- Today's Update Section -->
-                        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-lg p-6 mb-8 text-white">
-                            <h3 class="text-xl font-bold mb-4 flex items-center">
-                                <i class="fas fa-calendar-day mr-2"></i> আজকের আপডেট (${new Date().toLocaleDateString('bn-BD')})
-                            </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div class="bg-white/20 backdrop-blur-sm p-4 rounded-lg">
-                                    <p class="text-indigo-100 text-sm">আজকের অর্ডার</p>
-                                    <p class="text-3xl font-bold">${todayOrders.length}</p>
-                                </div>
-                                <div class="bg-white/20 backdrop-blur-sm p-4 rounded-lg">
-                                    <p class="text-indigo-100 text-sm">আজকের আয়</p>
-                                    <p class="text-3xl font-bold">৳ ${todayRevenue}</p>
-                                </div>
-                                <div class="bg-white/20 backdrop-blur-sm p-4 rounded-lg">
-                                    <p class="text-indigo-100 text-sm">গড় অর্ডার মূল্য</p>
-                                    <p class="text-3xl font-bold">৳ ${todayOrders.length > 0 ? Math.round(todayRevenue / todayOrders.length) : 0}</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            <!-- Recent Orders -->
-                            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-xl font-bold text-gray-800">সাম্প্রতিক অর্ডার</h3>
-                                    <button onclick="loadPage('orders')" class="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">সব দেখুন</button>
-                                </div>
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full">
-                                        <thead class="bg-gray-50">
-                                            <tr>
-                                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">অর্ডার আইডি</th>
-                                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">গ্রাহক</th>
-                                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">টাকা</th>
-                                                <th class="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">স্ট্যাটাস</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-200">
-                                            ${recentOrders.length > 0 ? recentOrders.map(order => `
-                                                <tr>
-                                                    <td class="py-3 px-4 text-sm font-medium text-gray-900">#${order.order_id}</td>
-                                                    <td class="py-3 px-4 text-sm text-gray-500">${order.customer_name}</td>
-                                                    <td class="py-3 px-4 text-sm font-bold text-gray-700">৳ ${order.total_amount}</td>
-                                                    <td class="py-3 px-4">
-                                                        <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)}">
-                                                            ${order.status}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            `).join('') : '<tr><td colspan="4" class="py-4 text-center text-gray-500">কোন অর্ডার নেই</td></tr>'}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- Quick Actions -->
-                            <div class="bg-white p-6 rounded-xl shadow">
-                                <h3 class="text-xl font-bold text-gray-800 mb-4">দ্রুত কাজ</h3>
-                                <div class="space-y-4">
-                                    <button onclick="loadPage('books')" class="w-full flex items-center p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition duration-200">
-                                        <i class="fas fa-plus-circle text-indigo-600 text-xl mr-3"></i>
-                                        <div class="text-left">
-                                            <p class="font-semibold text-gray-800">নতুন বই যোগ করুন</p>
-                                            <p class="text-sm text-gray-600">আপনার সংগ্রহে নতুন বই যোগ করুন</p>
-                                        </div>
-                                        <i class="fas fa-chevron-right ml-auto text-gray-400"></i>
-                                    </button>
-                                    
-                                    <button onclick="loadPage('orders')" class="w-full flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition duration-200">
-                                        <i class="fas fa-shopping-cart text-green-600 text-xl mr-3"></i>
-                                        <div class="text-left">
-                                            <p class="font-semibold text-gray-800">অর্ডার ম্যানেজ করুন</p>
-                                            <p class="text-sm text-gray-600">নতুন অর্ডার দেখুন এবং ম্যানেজ করুন</p>
-                                        </div>
-                                        <i class="fas fa-chevron-right ml-auto text-gray-400"></i>
-                                    </button>
-                                </div>
-                            </div>
+                        <div>
+                            <p class="text-gray-500 font-medium">সর্বমোট বই</p>
+                            <p class="text-3xl font-bold text-gray-800">${totalBooks}</p>
                         </div>
                     </div>
-                `;
-                
-                document.getElementById('contentArea').innerHTML = content;
-            }
+
+                    <!-- Total Orders -->
+                    <div class="stat-card bg-white p-6 rounded-xl shadow-md flex items-center">
+                        <div class="bg-green-100 p-4 rounded-full mr-4">
+                            <i class="fas fa-shopping-cart text-3xl text-green-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 font-medium">সর্বমোট অর্ডার</p>
+                            <p class="text-3xl font-bold text-gray-800">${totalOrders}</p>
+                        </div>
+                    </div>
+
+                    <!-- Total Revenue -->
+                    <div class="stat-card bg-white p-6 rounded-xl shadow-md flex items-center">
+                        <div class="bg-yellow-100 p-4 rounded-full mr-4">
+                            <i class="fas fa-dollar-sign text-3xl text-yellow-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 font-medium">সর্বমোট আয়</p>
+                            <p class="text-3xl font-bold text-gray-800">৳${totalRevenue.toLocaleString('bn-BD')}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">স্বাগতম, ${currentAdmin.name}!</h3>
+                    <p class="text-gray-600">এখান থেকে আপনি আপনার ওয়েবসাইটের বই, অর্ডার এবং অন্যান্য বিষয় পরিচালনা করতে পারবেন।</p>
+                </div>
+            `;
         }
-        
-        // Books Management
-        async function loadBooks() {
-            const booksResult = await books.getAll();
-            const categoriesResult = await categories.getAll();
-            
-            if (booksResult.success) {
-                const allBooks = booksResult.data;
-                const allCategories = categoriesResult.success ? categoriesResult.data : [];
-                
-                let booksHtml = '';
-                
-                if (allBooks.length === 0) {
-                    booksHtml = `
-                        <div class="text-center py-12">
-                            <i class="fas fa-book-open text-6xl text-gray-300 mb-4"></i>
-                            <h3 class="text-xl font-bold text-gray-500 mb-2">কোন বই পাওয়া যায়নি</h3>
-                            <p class="text-gray-500 mb-6">প্রথম বই যোগ করুন</p>
-                            <button onclick="openBookModal('add')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg">
-                                <i class="fas fa-plus mr-2"></i> নতুন বই যোগ করুন
-                            </button>
-                        </div>
-                    `;
-                } else {
-                    booksHtml = `
-                        <div class="fade-in">
-                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                                <h2 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">বই ম্যানেজমেন্ট</h2>
-                                <button onclick="openBookModal('add')" 
-                                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg flex items-center">
-                                    <i class="fas fa-plus mr-2"></i> নতুন বই যোগ করুন
-                                </button>
-                            </div>
-                            
-                            <div class="table-responsive">
-                                <table id="booksTable" class="min-w-full bg-white rounded-lg shadow">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="py-3 px-4 text-left">ছবি</th>
-                                            <th class="py-3 px-4 text-left">বইয়ের নাম</th>
-                                            <th class="py-3 px-4 text-left">লেখক</th>
-                                            <th class="py-3 px-4 text-left">দাম</th>
-                                            <th class="py-3 px-4 text-left">স্টক</th>
-                                            <th class="py-3 px-4 text-left">কার্যক্রম</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${allBooks.map(book => `
-                                            <tr class="border-t border-gray-200">
-                                                <td class="py-4 px-4">
-                                                    <img src="${book.image}" alt="${book.title}" 
-                                                         class="w-12 h-16 object-cover rounded">
-                                                </td>
-                                                <td class="py-4 px-4">
-                                                    <p class="font-semibold">${book.title}</p>
-                                                    <p class="text-sm text-gray-600">${book.category}</p>
-                                                </td>
-                                                <td class="py-4 px-4">${book.author}</td>
-                                                <td class="py-4 px-4">
-                                                    <span class="font-bold text-indigo-600">৳ ${book.price}</span>
-                                                </td>
-                                                <td class="py-4 px-4">
-                                                    <span class="px-2 py-1 rounded-full text-xs ${book.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                                        ${book.stock} কপি
-                                                    </span>
-                                                </td>
-                                                <td class="py-4 px-4">
-                                                    <div class="flex space-x-2">
-                                                        <button onclick="openBookModal('edit', ${book.id})" 
-                                                                class="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
-                                                            <i class="fas fa-edit"></i>
-                                                        </button>
-                                                        <button onclick="showConfirm('deleteBook', ${book.id}, 'আপনি কি "${book.title}" বইটি ডিলিট করতে চান?')" 
-                                                                class="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    `;
+                async function loadBooks() {
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">বইয়ের তালিকা</h3>
+                        <button onclick="openBookModal('add')" class="requires-editor bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                            <i class="fas fa-plus mr-2"></i> নতুন বই যোগ করুন
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="booksTable" class="display" width="100%"></table>
+                    </div>
+                </div>
+            `;
+
+            const booksRes = await books.getAll();
+            if (booksRes.success) {
+                if (dataTable) {
+                    dataTable.destroy();
                 }
-                
-                document.getElementById('contentArea').innerHTML = booksHtml;
-                
-                // Initialize DataTable if books exist
-                if (allBooks.length > 0 && $.fn.DataTable) {
-                    if ($.fn.DataTable.isDataTable('#booksTable')) {
-                        dataTable.destroy();
+                dataTable = $('#booksTable').DataTable({
+                    data: booksRes.data,
+                    columns: [
+                        { title: "ছবি", data: 'image_url', render: (d) => `<img src="${d || 'https://placehold.co/40x40'}" class="w-10 h-10 rounded-md object-cover">` },
+                        { title: "নাম", data: 'title' },
+                        { title: "লেখক", data: 'author' },
+                        { title: "মূল্য", data: 'price', render: (d) => `৳${d}` },
+                        { title: "স্টক", data: 'stock' },
+                        { title: "বেস্টসেলার", data: 'is_bestseller', render: (d) => d ? '<span class="px-2 py-1 bg-green-200 text-green-800 rounded-full text-xs">হ্যাঁ</span>' : '<span class="px-2 py-1 bg-red-200 text-red-800 rounded-full text-xs">না</span>' },
+                        {
+                            title: "অ্যাকশন",
+                            data: 'id',
+                            render: (id) => `
+                                <div class="flex space-x-2">
+                                    <button onclick="openBookModal('edit', '${id}')" class="requires-editor text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                    <button onclick="showConfirm('deleteBook', '${id}', 'আপনি কি এই বইটি মুছে ফেলতে চান?')" class="requires-admin text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                                </div>
+                            `
+                        }
+                    ],
+                    responsive: true,
+                    language: {
+                        search: "অনুসন্ধান:",
+                        lengthMenu: "_MENU_ প্রতি পৃষ্ঠায় ফলাফল",
+                        info: "_TOTAL_ বইয়ের মধ্যে _START_ থেকে _END_ পর্যন্ত দেখানো হচ্ছে",
+                        paginate: {
+                            first: "প্রথম",
+                            last: "শেষ",
+                            next: "পরবর্তী",
+                            previous: "পূর্ববর্তী"
+                        }
                     }
-                    
-                    dataTable = $('#booksTable').DataTable({
-                        responsive: true,
-                        language: {
-                            search: "অনুসন্ধান:",
-                            lengthMenu: "প্রতি পৃষ্ঠায় _MENU_ টি রেকর্ড দেখান",
-                            info: "_TOTAL_ টি বইয়ের মধ্যে _START_ থেকে _END_ পর্যন্ত দেখানো হচ্ছে",
-                            paginate: {
-                                first: "প্রথম",
-                                last: "শেষ",
-                                next: "পরবর্তী",
-                                previous: "পূর্ববর্তী"
-                            }
-                        },
-                        pageLength: 10
-                    });
-                }
-                
-                // Load categories for modal
-                loadCategoriesDropdown(allCategories);
+                });
+            } else {
+                showError('বই লোড করতে সমস্যা হয়েছে: ' + booksRes.message);
             }
         }
-        
-        // Load categories dropdown
-        function loadCategoriesDropdown(categoriesList) {
-            const select = document.getElementById('bookCategory');
-            select.innerHTML = '<option value="">ক্যাটাগরি নির্বাচন করুন</option>';
-            
-            categoriesList.forEach(category => {
-                const option = document.createElement('option');
-                option.value = category.name;
-                option.textContent = category.name;
-                select.appendChild(option);
+                async function loadCategories() {
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 fade-in">
+                    <!-- Category List -->
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">ক্যাটাগরি তালিকা</h3>
+                        <div id="categoryList" class="space-y-3">
+                            <!-- Categories will be loaded here -->
+                            <div class="text-center p-4 text-gray-500">লোড হচ্ছে...</div>
+                        </div>
+                    </div>
+
+                    <!-- Add Category -->
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">নতুন ক্যাটাগরি যোগ করুন</h3>
+                        <form id="categoryForm" class="space-y-4">
+                            <div>
+                                <label class="block text-gray-700 font-medium mb-2">ক্যাটাগরির নাম</label>
+                                <input type="text" id="categoryName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 font-medium mb-2">আইকন (e.g., fas fa-book)</label>
+                                <input type="text" id="categoryIcon" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <button type="submit" class="requires-admin bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+                                <i class="fas fa-plus mr-2"></i> যোগ করুন
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            const categoryRes = await categories.getAll();
+            const categoryListDiv = document.getElementById('categoryList');
+
+            if (categoryRes.success) {
+                categoryListDiv.innerHTML = categoryRes.data.map(cat => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center">
+                            <i class="${cat.icon || 'fas fa-tag'} text-indigo-500 w-6 text-center mr-3"></i>
+                            <span class="font-medium text-gray-700">${cat.name}</span>
+                        </div>
+                        <button onclick="showConfirm('deleteCategory', '${cat.id}', 'আপনি কি এই ক্যাটাগরিটি মুছে ফেলতে চান?')" class="requires-super-admin text-red-500 hover:text-red-700 text-sm">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } else {
+                categoryListDiv.innerHTML = `<div class="text-red-500">ক্যাটাগরি লোড করা যায়নি।</div>`;
+                showError('ক্যাটাগরি লোড করতে সমস্যা হয়েছে: ' + categoryRes.message);
+            }
+
+            document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('categoryName').value;
+                const icon = document.getElementById('categoryIcon').value;
+                if (!name) {
+                    showError('ক্যাটাগরির নাম প্রয়োজন।');
+                    return;
+                }
+                const result = await categories.create({ name, icon });
+                if (result.success) {
+                    showMessage('success', 'ক্যাটাগরি যোগ করা হয়েছে।');
+                    loadPage('categories');
+                } else {
+                    showError('ক্যাটাগরি যোগ করতে সমস্যা হয়েছে: ' + result.message);
+                }
             });
         }
-        
-        // Book Modal
-        window.openBookModal = async function(action, bookId = null) {
-            const modal = document.getElementById('bookModal');
-            const title = document.getElementById('bookModalTitle');
-            
-            if (action === 'add') {
-                title.textContent = 'নতুন বই যোগ করুন';
-                document.getElementById('bookForm').reset();
-                document.getElementById('bookId').value = '';
-            } else if (action === 'edit' && bookId) {
-                title.textContent = 'বই এডিট করুন';
-                
-                const result = await books.getById(bookId);
+                async function loadOrders() {
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md fade-in">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">অর্ডার তালিকা</h3>
+                    <div class="table-responsive">
+                        <table id="ordersTable" class="display" width="100%"></table>
+                    </div>
+                </div>
+            `;
+
+            const ordersRes = await orders.getAll();
+            if (ordersRes.success) {
+                loadedOrders = ordersRes.data;
+                if (dataTable) {
+                    dataTable.destroy();
+                }
+                dataTable = $('#ordersTable').DataTable({
+                    data: loadedOrders,
+                    columns: [
+                        { title: "অর্ডার ID", data: 'order_id' },
+                        { 
+                            title: "গ্রাহক", 
+                            data: 'customer_details',
+                            render: function(data, type, row) {
+                                return data && data.name ? data.name : 'অজানা';
+                            }
+                        },
+                        { title: "মোট", data: 'total_amount', render: (d) => `৳${d.toLocaleString('bn-BD')}` },
+                        { title: "স্ট্যাটাস", data: 'status', render: getStatusBadge },
+                        { title: "তারিখ", data: 'created_at', render: (d) => new Date(d).toLocaleDateString('bn-BD') },
+                        {
+                            title: "অ্যাকশন",
+                            data: 'id',
+                            render: (id) => `
+                                <button onclick="openOrderModal('${id}')" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600">
+                                    বিস্তারিত দেখুন
+                                </button>
+                            `
+                        }
+                    ],
+                    responsive: true,
+                    language: {
+                        search: "অনুসন্ধান:",
+                        lengthMenu: "_MENU_ প্রতি পৃষ্ঠায় ফলাফল",
+                        info: "_TOTAL_ অর্ডারের মধ্যে _START_ থেকে _END_ পর্যন্ত দেখানো হচ্ছে",
+                        paginate: {
+                            first: "প্রথম",
+                            last: "শেষ",
+                            next: "পরবর্তী",
+                            previous: "পূর্ববর্তী"
+                        }
+                    }
+                });
+            } else {
+                showError('অর্ডার লোড করতে সমস্যা হয়েছে: ' + ordersRes.message);
+            }
+        }
+
+        function getStatusBadge(status) {
+            const baseClasses = 'px-2 py-1 rounded-full text-xs font-medium';
+            switch (status) {
+                case 'pending': return `<span class="${baseClasses} bg-yellow-200 text-yellow-800">Pending</span>`;
+                case 'processing': return `<span class="${baseClasses} bg-blue-200 text-blue-800">Processing</span>`;
+                case 'completed': return `<span class="${baseClasses} bg-green-200 text-green-800">Completed</span>`;
+                case 'cancelled': return `<span class="${baseClasses} bg-red-200 text-red-800">Cancelled</span>`;
+                default: return `<span class="${baseClasses} bg-gray-200 text-gray-800">${status}</span>`;
+            }
+        }
+                async function loadSettings() {
+            if (currentAdmin.role !== 'super_admin' && currentAdmin.role !== 'admin') {
+                document.getElementById('contentArea').innerHTML = `<div class="text-red-500 p-4">এই পেজটি দেখার জন্য আপনার অনুমতি নেই।</div>`;
+                return;
+            }
+
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md fade-in">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6">সাইট সেটিংস</h3>
+                    <form id="settingsForm" class="space-y-6">
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">সাইটের নাম</label>
+                            <input type="text" id="siteName" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">যোগাযোগের ইমেইল</label>
+                            <input type="email" id="contactEmail" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">ডেলিভারি চার্জ (৳)</label>
+                            <input type="number" id="deliveryCharge" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                         <div class="border-t pt-6">
+                            <button type="submit" class="requires-admin bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700">
+                                <i class="fas fa-save mr-2"></i> সংরক্ষণ করুন
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            const settingsRes = await settings.get();
+            if (settingsRes.success) {
+                const siteSettings = settingsRes.data;
+                document.getElementById('siteName').value = siteSettings.site_title || '';
+                document.getElementById('contactEmail').value = siteSettings.contact_email || '';
+                document.getElementById('deliveryCharge').value = siteSettings.delivery_charge || '60';
+            } else {
+                showError('সেটিংস লোড করতে সমস্যা হয়েছে।');
+            }
+
+            document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const updatedSettings = {
+                    site_title: document.getElementById('siteName').value,
+                    contact_email: document.getElementById('contactEmail').value,
+                    delivery_charge: parseFloat(document.getElementById('deliveryCharge').value)
+                };
+
+                const result = await settings.update(updatedSettings);
                 if (result.success) {
-                    const book = result.data;
-                    
+                    showMessage('success', 'সেটিংস আপডেট করা হয়েছে।');
+                } else {
+                    showError('সেটিংস আপডেট করতে সমস্যা হয়েছে: ' + result.message);
+                }
+            });
+        }
+                async function loadUsers() {
+            if (currentAdmin.role !== 'super_admin') {
+                document.getElementById('contentArea').innerHTML = `<div class="text-red-500 p-4">এই পেজটি দেখার জন্য আপনার অনুমতি নেই।</div>`;
+                return;
+            }
+
+            const contentArea = document.getElementById('contentArea');
+            contentArea.innerHTML = `
+                <div class="bg-white p-6 rounded-xl shadow-md fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">ব্যবহারকারী তালিকা</h3>
+                        <button onclick="openUserModal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                            <i class="fas fa-plus mr-2"></i> নতুন ব্যবহারকারী
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="usersTable" class="display" width="100%"></table>
+                    </div>
+                </div>
+            `;
+
+            const usersRes = await admins.getAll();
+            if (usersRes.success) {
+                if (dataTable) {
+                    dataTable.destroy();
+                }
+                dataTable = $('#usersTable').DataTable({
+                    data: usersRes.data,
+                    columns: [
+                        { title: "নাম", data: 'name' },
+                        { title: "ইমেইল", data: 'email' },
+                        { title: "ভূমিকা", data: 'role' },
+                        {
+                            title: "অ্যাকশন",
+                            data: 'id',
+                            render: (id, type, row) => {
+                                // Prevent current user from deleting themselves
+                                if (row.email === currentAdmin.email) {
+                                    return `<button onclick="openUserModal('edit', '${id}')" class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>`;
+                                }
+                                return `
+                                    <div class="flex space-x-2">
+                                        <button onclick="openUserModal('edit', '${id}')" class="text-blue-600 hover:text-blue-800"><i class="fas fa-edit"></i></button>
+                                        <button onclick="showConfirm('deleteUser', '${id}', 'আপনি কি এই ব্যবহারকারীকে মুছে ফেলতে চান?')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                `;
+                            }
+                        }
+                    ],
+                    responsive: true,
+                    language: {
+                        search: "অনুসন্ধান:",
+                        info: "_TOTAL_ ব্যবহারকারীর মধ্যে _START_ থেকে _END_ পর্যন্ত দেখানো হচ্ছে",
+                        paginate: { next: "পরবর্তী", previous: "পূর্ববর্তী" }
+                    }
+                });
+            } else {
+                showError('ব্যবহারকারী লোড করতে সমস্যা হয়েছে: ' + usersRes.message);
+            }
+        }
+
+        // --- MODAL HANDLERS ---
+        window.openBookModal = async function(action, bookId = null) {
+            document.getElementById('bookForm').reset();
+            document.getElementById('bookId').value = '';
+            
+            const modalTitle = document.getElementById('bookModalTitle');
+            const categorySelect = document.getElementById('bookCategory');
+            
+            // Populate categories
+            const catRes = await categories.getAll();
+            if (catRes.success) {
+                categorySelect.innerHTML = '<option value="">ক্যাটাগরি নির্বাচন করুন</option>' + 
+                    catRes.data.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            }
+
+            if (action === 'edit') {
+                modalTitle.textContent = 'বই এডিট করুন';
+                const bookRes = await books.getById(bookId);
+                if (bookRes.success) {
+                    const book = bookRes.data;
                     document.getElementById('bookId').value = book.id;
                     document.getElementById('bookTitle').value = book.title;
                     document.getElementById('bookAuthor').value = book.author;
                     document.getElementById('bookPrice').value = book.price;
-                    document.getElementById('bookOriginalPrice').value = book.original_price || '';
+                    document.getElementById('bookOriginalPrice').value = book.original_price;
                     document.getElementById('bookCategory').value = book.category;
                     document.getElementById('bookStock').value = book.stock;
-                    document.getElementById('bookImage').value = book.image;
-                    document.getElementById('bookPdfUrl').value = book.pdf_url || '';
+                    document.getElementById('bookImage').value = book.image_url;
+                    document.getElementById('bookPdfUrl').value = book.pdf_url;
                     document.getElementById('bookDescription').value = book.description;
-                    document.getElementById('bookIsBestseller').checked = book.is_bestseller || false;
+                    document.getElementById('bookIsBestseller').checked = book.is_bestseller;
+                } else {
+                    showError('বই এর তথ্য লোড করা যায়নি।');
+                    return;
                 }
+            } else {
+                modalTitle.textContent = 'নতুন বই যোগ করুন';
             }
             
-            modal.classList.add('active');
+            document.getElementById('bookModal').classList.add('active');
         };
-        
+
         window.closeModal = function() {
             document.getElementById('bookModal').classList.remove('active');
         };
-        
-        // Book form submission
-        document.getElementById('bookForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const bookId = document.getElementById('bookId').value;
-            const bookData = {
-                title: document.getElementById('bookTitle').value,
-                author: document.getElementById('bookAuthor').value,
-                price: parseFloat(document.getElementById('bookPrice').value),
-                original_price: document.getElementById('bookOriginalPrice').value ? 
-                    parseFloat(document.getElementById('bookOriginalPrice').value) : null,
-                category: document.getElementById('bookCategory').value,
-                stock: parseInt(document.getElementById('bookStock').value),
-                image: document.getElementById('bookImage').value,
-                pdf_url: document.getElementById('bookPdfUrl').value,
-                description: document.getElementById('bookDescription').value,
-                is_bestseller: document.getElementById('bookIsBestseller').checked
-            };
-            
-            const saveBtn = document.getElementById('saveBookBtn');
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> সংরক্ষণ হচ্ছে...';
-            
-            try {
-                let result;
-                if (bookId) {
-                    result = await books.update(bookId, bookData);
-                } else {
-                    result = await books.create(bookData);
-                }
-                
-                if (result.success) {
-                    closeModal();
-                    showMessage('success', bookId ? 'বই আপডেট করা হয়েছে' : 'বই যোগ করা হয়েছে');
-                    loadPage('books');
-                } else {
-                    showMessage('error', result.message);
-                }
-            } catch (error) {
-                showMessage('error', 'সংরক্ষণ করতে সমস্যা হয়েছে');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'সংরক্ষণ করুন';
+
+        window.openOrderModal = async function(orderId) {
+            const order = loadedOrders.find(o => o.id.toString() === orderId);
+            if (!order) {
+                showError('অর্ডার খুঁজে পাওয়া যায়নি।');
+                return;
             }
-        });
-        
-        // Confirmation Modal
-        window.showConfirm = function(action, data, message) {
-            confirmAction = action;
-            confirmData = data;
-            
-            document.getElementById('confirmMessage').textContent = message;
-            document.getElementById('confirmModal').classList.add('active');
-        };
-        
-        window.closeConfirmModal = function() {
-            document.getElementById('confirmModal').classList.remove('active');
-            confirmAction = null;
-            confirmData = null;
-        };
-        
-        window.processConfirm = async function() {
-            if (confirmAction === 'deleteBook') {
-                const result = await books.delete(confirmData);
-                if (result.success) {
-                    showMessage('success', 'বই ডিলিট করা হয়েছে');
-                    loadPage('books');
-                } else {
-                    showMessage('error', 'ডিলিট করতে সমস্যা হয়েছে');
-                }
-            }
-            
-            closeConfirmModal();
-        };
-        
-        // Categories Management
-        async function loadCategories() {
-            const result = await categories.getAll();
-            
-            if (result.success) {
-                const content = `
-                    <div class="fade-in">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-4 md:mb-0">ক্যাটাগরি ম্যানেজমেন্ট</h2>
-                            <button onclick="addCategory()" 
-                                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg flex items-center">
-                                <i class="fas fa-plus mr-2"></i> নতুন ক্যাটাগরি
-                            </button>
-                        </div>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            ${result.data.map(category => `
-                                <div class="bg-white p-6 rounded-xl shadow">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div class="flex items-center">
-                                            <div class="bg-indigo-100 p-3 rounded-lg mr-4">
-                                                <i class="${category.icon || 'fas fa-tag'} text-indigo-600"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-bold text-gray-800">${category.name}</h3>
-                                            </div>
-                                        </div>
-                                        <button onclick="showConfirm('deleteCategory', ${category.id}, 'আপনি কি "${category.name}" ক্যাটাগরি ডিলিট করতে চান?')" 
-                                                class="text-red-500 hover:text-red-700">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                
-                document.getElementById('contentArea').innerHTML = content;
-            }
-        }
-        
-        // Orders Management
-        async function loadOrders() {
-            const result = await orders.getAll();
-            
-            if (result.success) {
-                loadedOrders = result.data;
-                let ordersHtml = '';
-                
-                if (result.data.length === 0) {
-                    ordersHtml = `
-                        <div class="text-center py-12">
-                            <i class="fas fa-shopping-cart text-6xl text-gray-300 mb-4"></i>
-                            <h3 class="text-xl font-bold text-gray-500 mb-2">কোন অর্ডার নেই</h3>
-                            <p class="text-gray-500">এখনও কোন অর্ডার প্লেস করা হয়নি</p>
-                        </div>
-                    `;
-                } else {
-                    ordersHtml = `
-                        <div class="fade-in">
-                            <h2 class="text-2xl font-bold text-gray-800 mb-6">অর্ডার ম্যানেজমেন্ট</h2>
-                            
-                            <div class="table-responsive">
-                                <table class="min-w-full bg-white rounded-lg shadow">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="py-3 px-4 text-left">অর্ডার আইডি</th>
-                                            <th class="py-3 px-4 text-left">গ্রাহক</th>
-                                            <th class="py-3 px-4 text-left">ফোন</th>
-                                            <th class="py-3 px-4 text-left">মোট</th>
-                                            <th class="py-3 px-4 text-left">স্ট্যাটাস</th>
-                                            <th class="py-3 px-4 text-left">তারিখ</th>
-                                            <th class="py-3 px-4 text-left">অ্যাকশন</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${result.data.map(order => `
-                                            <tr class="border-t border-gray-200">
-                                                <td class="py-4 px-4 font-semibold">${order.order_id}</td>
-                                                <td class="py-4 px-4">
-                                                    <p class="font-semibold">${order.customer_name}</p>
-                                                    <p class="text-sm text-gray-600">${order.customer_email}</p>
-                                                </td>
-                                                <td class="py-4 px-4">${order.customer_phone}</td>
-                                                <td class="py-4 px-4 font-bold text-indigo-600">৳ ${order.total_amount}</td>
-                                                <td class="py-4 px-4">
-                                                    <span class="px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}">
-                                                        ${order.status}
-                                                    </span>
-                                                </td>
-                                                <td class="py-4 px-4">${new Date(order.created_at).toLocaleDateString('bn-BD')}</td>
-                                                <td class="py-4 px-4">
-                                                    <button onclick="openOrderModal('${order.id}')" class="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
-                                                        <i class="fas fa-eye mr-1"></i> বিস্তারিত
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                document.getElementById('contentArea').innerHTML = ordersHtml;
-            }
-        }
-        
-        function getStatusColor(status) {
-            switch(status) {
-                case 'pending': return 'bg-yellow-100 text-yellow-800';
-                case 'processing': return 'bg-blue-100 text-blue-800';
-                case 'completed': return 'bg-green-100 text-green-800';
-                case 'cancelled': return 'bg-red-100 text-red-800';
-                default: return 'bg-gray-100 text-gray-800';
-            }
-        }
-        
-        // Order Modal Functions
-        window.openOrderModal = function(orderId) {
-            const order = loadedOrders.find(o => o.id == orderId);
-            if (!order) return;
-            
-            const modal = document.getElementById('orderModal');
-            
+
+            document.getElementById('orderForm').reset();
             document.getElementById('orderId').value = order.id;
             document.getElementById('orderDisplayId').value = order.order_id;
-            document.getElementById('orderDeliveryCharge').value = order.delivery_charge || 0;
             document.getElementById('orderDate').value = new Date(order.created_at).toLocaleString('bn-BD');
-            document.getElementById('orderCustomerName').value = order.customer_name;
-            document.getElementById('orderCustomerPhone').value = order.customer_phone;
-            document.getElementById('orderCustomerEmail').value = order.customer_email;
-            document.getElementById('orderCustomerAddress').value = order.customer_address;
-            document.getElementById('orderStatus').value = order.status;
-            document.getElementById('orderTotalAmount').textContent = `৳ ${order.total_amount}`;
             
-            // Populate items
-            const itemsContainer = document.getElementById('orderItemsList');
+            const details = order.customer_details || {};
+            document.getElementById('orderCustomerName').value = details.name || '';
+            document.getElementById('orderCustomerPhone').value = details.phone || '';
+            document.getElementById('orderCustomerEmail').value = details.email || '';
+            document.getElementById('orderCustomerAddress').value = details.address || '';
+            
+            document.getElementById('orderStatus').value = order.status;
+            document.getElementById('orderDeliveryCharge').value = order.delivery_charge;
+
+            const itemsList = document.getElementById('orderItemsList');
+            let subtotal = 0;
             if (order.items && order.items.length > 0) {
-                itemsContainer.innerHTML = order.items.map((item, index) => `
-                    <div class="order-item bg-white p-3 rounded border border-gray-200 mb-2" data-index="${index}">
-                        <div class="flex items-start gap-3 mb-2">
-                            <img src="${item.image}" class="w-12 h-16 object-cover rounded">
-                            <div class="flex-1">
-                                <p class="font-semibold text-sm mb-1">${item.title}</p>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">দাম</label>
-                                        <input type="number" class="item-price w-full px-2 py-1 text-sm border rounded" 
-                                               value="${item.price}" oninput="calculateOrderTotal()">
-                                    </div>
-                                    <div>
-                                        <label class="text-xs text-gray-500 block">পরিমাণ</label>
-                                        <input type="number" class="item-quantity w-full px-2 py-1 text-sm border rounded" 
-                                               value="${item.quantity}" min="1" oninput="calculateOrderTotal()">
-                                    </div>
-                                </div>
+                itemsList.innerHTML = order.items.map(item => {
+                    subtotal += item.price * item.quantity;
+                    return `
+                        <div class="flex justify-between items-center p-2 border-b">
+                            <div>
+                                <p class="font-semibold">${item.title}</p>
+                                <p class="text-sm text-gray-600">৳ ${item.price} x ${item.quantity}</p>
                             </div>
+                            <p class="font-bold">৳ ${item.price * item.quantity}</p>
                         </div>
-                        <div class="text-right font-bold text-gray-700 item-total">
-                            ৳ ${item.price * item.quantity}
-                        </div>
-                        <input type="hidden" class="item-id" value="${item.id}">
-                        <input type="hidden" class="item-title" value="${item.title}">
-                        <input type="hidden" class="item-image" value="${item.image}">
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             } else {
-                itemsContainer.innerHTML = '<p class="text-gray-500 text-sm">কোন পণ্য নেই</p>';
+                itemsList.innerHTML = '<p class="text-gray-500">কোনো আইটেম নেই।</p>';
             }
             
             calculateOrderTotal();
-            modal.classList.add('active');
+            document.getElementById('orderModal').classList.add('active');
         };
+
+        window.calculateOrderTotal = function() {
+            let subtotal = 0;
+            const orderId = document.getElementById('orderId').value;
+            const order = loadedOrders.find(o => o.id.toString() === orderId);
+            if (order && order.items) {
+                subtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            }
+            
+            const delivery = parseFloat(document.getElementById('orderDeliveryCharge').value) || 0;
+            document.getElementById('orderTotalAmount').textContent = `৳ ${(subtotal + delivery).toLocaleString('bn-BD')}`;
+        }
 
         window.closeOrderModal = function() {
             document.getElementById('orderModal').classList.remove('active');
         };
 
-        window.calculateOrderTotal = function() {
-            let subtotal = 0;
-            const itemElements = document.querySelectorAll('.order-item');
-            
-            itemElements.forEach(el => {
-                const price = parseFloat(el.querySelector('.item-price').value) || 0;
-                const quantity = parseInt(el.querySelector('.item-quantity').value) || 0;
-                const total = price * quantity;
-                
-                el.querySelector('.item-total').textContent = `৳ ${total}`;
-                subtotal += total;
-            });
-            
-            const deliveryCharge = parseFloat(document.getElementById('orderDeliveryCharge').value) || 0;
-            const total = subtotal + deliveryCharge;
-            
-            document.getElementById('orderTotalAmount').textContent = `৳ ${total}`;
-            return total;
-        };
+        window.openUserModal = async function(action, userId = null) {
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            const modalTitle = document.getElementById('userModalTitle');
+            const passwordField = document.getElementById('password-field');
+            const userEmail = document.getElementById('userEmail');
 
-        // Order form submission
-        document.getElementById('orderForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const orderId = document.getElementById('orderId').value;
-            
-            // Reconstruct items array
-            const items = [];
-            document.querySelectorAll('.order-item').forEach(el => {
-                items.push({
-                    id: parseInt(el.querySelector('.item-id').value),
-                    title: el.querySelector('.item-title').value,
-                    image: el.querySelector('.item-image').value,
-                    price: parseFloat(el.querySelector('.item-price').value),
-                    quantity: parseInt(el.querySelector('.item-quantity').value)
-                });
-            });
-            
-            const deliveryCharge = parseFloat(document.getElementById('orderDeliveryCharge').value) || 0;
-            const totalAmount = window.calculateOrderTotal();
-            
-            const updateData = {
-                customer_name: document.getElementById('orderCustomerName').value,
-                customer_phone: document.getElementById('orderCustomerPhone').value,
-                customer_email: document.getElementById('orderCustomerEmail').value,
-                customer_address: document.getElementById('orderCustomerAddress').value,
-                status: document.getElementById('orderStatus').value,
-                items: items,
-                delivery_charge: deliveryCharge,
-                total_amount: totalAmount
-            };
-            
-            const saveBtn = document.getElementById('saveOrderBtn');
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> আপডেট হচ্ছে...';
-            
-            try {
-                const result = await orders.update(orderId, updateData);
-                if (result.success) {
-                    closeOrderModal();
-                    showMessage('success', 'অর্ডার আপডেট করা হয়েছে');
-                    loadPage('orders');
+            if (action === 'edit') {
+                modalTitle.textContent = 'ব্যবহারকারী এডিট করুন';
+                passwordField.style.display = 'none'; // Hide password field on edit
+                userEmail.readOnly = true;
+                
+                const userRes = await admins.getAll(); // Not ideal, but we need to find the user
+                if (userRes.success) {
+                    const user = userRes.data.find(u => u.id.toString() === userId);
+                    if (user) {
+                        document.getElementById('userId').value = user.id;
+                        document.getElementById('userName').value = user.name;
+                        document.getElementById('userEmail').value = user.email;
+                        document.getElementById('userRole').value = user.role;
+                    } else {
+                        showError('ব্যবহারকারী খুঁজে পাওয়া যায়নি।');
+                        return;
+                    }
                 } else {
-                    showMessage('error', result.message || 'আপডেট করতে সমস্যা হয়েছে');
-                }
-            } catch (error) {
-                showMessage('error', 'আপডেট করতে সমস্যা হয়েছে');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'আপডেট করুন';
-            }
-        });
-
-        // Settings Management
-        async function loadSettings() {
-            const result = await settings.get();
-            
-            if (result.success) {
-                const siteSettings = result.data;
-                
-                const content = `
-                    <div class="fade-in">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">ওয়েবসাইট সেটিংস</h2>
-                        
-                        <div class="bg-white p-6 rounded-xl shadow">
-                            <form id="settingsForm" class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-gray-700 font-medium mb-2">সাইটের নাম</label>
-                                        <input type="text" id="siteTitle" value="${siteSettings.title}" 
-                                               class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    </div>
-                                    
-                                    <div>
-                                        <label class="block text-gray-700 font-medium mb-2">যোগাযোগ ইমেইল</label>
-                                        <input type="email" id="contactEmail" value="${siteSettings.contact_email}" 
-                                               class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-medium mb-2">সাইটের বিবরণ</label>
-                                    <textarea id="siteDescription" rows="3"
-                                              class="w-full px-4 py-2 border border-gray-300 rounded-lg">${siteSettings.description}</textarea>
-                                </div>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-gray-700 font-medium mb-2">যোগাযোগ ফোন</label>
-                                        <input type="text" id="contactPhone" value="${siteSettings.contact_phone}" 
-                                               class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    </div>
-                                    
-                                    <div>
-                                        <label class="block text-gray-700 font-medium mb-2">ডেলিভারি চার্জ (৳)</label>
-                                        <input type="number" id="deliveryCharge" value="${siteSettings.delivery_charge}" 
-                                               class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-gray-700 font-medium mb-2">ফ্রি ডেলিভারি অ্যামাউন্ট (৳)</label>
-                                    <input type="number" id="freeDeliveryAmount" value="${siteSettings.free_delivery_amount}" 
-                                           class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                </div>
-                                
-                                <div class="flex justify-end space-x-4 pt-6">
-                                    <button type="button" onclick="resetSettings()" 
-                                            class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg">
-                                        রিসেট করুন
-                                    </button>
-                                    <button type="submit" 
-                                            class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                                        সংরক্ষণ করুন
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                `;
-                
-                document.getElementById('contentArea').innerHTML = content;
-                
-                // Handle settings form
-                document.getElementById('settingsForm').addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    const settingsData = {
-                        title: document.getElementById('siteTitle').value,
-                        description: document.getElementById('siteDescription').value,
-                        contact_email: document.getElementById('contactEmail').value,
-                        contact_phone: document.getElementById('contactPhone').value,
-                        delivery_charge: parseFloat(document.getElementById('deliveryCharge').value),
-                        free_delivery_amount: parseFloat(document.getElementById('freeDeliveryAmount').value)
-                    };
-                    
-                    const result = await settings.update(settingsData);
-                    if (result.success) {
-                        showMessage('success', 'সেটিংস সংরক্ষণ করা হয়েছে');
-                        // Update site title in sidebar
-                        document.getElementById('siteTitle').textContent = settingsData.title;
-                    } else {
-                        showMessage('error', 'সংরক্ষণ করতে সমস্যা হয়েছে');
-                    }
-                });
-            }
-        }
-        
-        // Helper functions
-        window.logout = function() {
-            if (confirm('আপনি কি লগআউট করতে চান?')) {
-                auth.logoutAdmin();
-            }
-        };
-        
-        window.showMessage = function(type, text) {
-            // Create toast notification
-            const toast = document.createElement('div');
-            toast.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} fade-in`;
-            toast.innerHTML = `
-                <div class="flex items-center">
-                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
-                    <span>${text}</span>
-                </div>
-            `;
-            
-            document.body.appendChild(toast);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                }, 300);
-            }, 3000);
-        };
-        
-        window.showLoading = function() {
-            document.getElementById('loadingOverlay').classList.remove('hidden');
-        };
-        
-        window.hideLoading = function() {
-            document.getElementById('loadingOverlay').classList.add('hidden');
-        };
-        
-        window.showError = function(message) {
-            showMessage('error', message);
-        };
-        
-        // Export functions for onclick handlers
-        window.addCategory = function() {
-            const name = prompt('নতুন ক্যাটাগরির নাম দিন:');
-            if (name) {
-                categories.create({ name: name.trim() }).then(result => {
-                    if (result.success) {
-                        showMessage('success', 'ক্যাটাগরি যোগ করা হয়েছে');
-                        loadPage('categories');
-                    } else {
-                        showMessage('error', 'ক্যাটাগরি যোগ করতে সমস্যা হয়েছে');
-                    }
-                });
-            }
-        };
-        
-        window.resetSettings = function() {
-            if (confirm('আপনি কি সেটিংস রিসেট করতে চান?')) {
-                // Reload page
-                loadPage('settings');
-            }
-        };
-        
-        // File Upload Handler (Converts file to Data URL)
-        window.handleFileUpload = function(input, targetId) {
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                
-                // Size validation (limit to 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showMessage('error', 'ফাইল সাইজ অনেক বড়! ৫MB এর নিচে ফাইল আপলোড করুন।');
-                    input.value = '';
+                    showError('ব্যবহারকারী লোড করতে সমস্যা হয়েছে।');
                     return;
                 }
 
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById(targetId).value = e.target.result;
-                };
-                reader.readAsDataURL(file);
+            } else {
+                modalTitle.textContent = 'নতুন ব্যবহারকারী যোগ করুন';
+                passwordField.style.display = 'block';
+                userEmail.readOnly = false;
+            }
+
+            document.getElementById('userModal').classList.add('active');
+        };
+
+        window.closeUserModal = function() {
+            document.getElementById('userModal').classList.remove('active');
+        };
+        
+        // --- FORM SUBMISSIONS ---
+        async function onBookFormSubmit(e) {
+            e.preventDefault();
+            const bookId = document.getElementById('bookId').value;
+            
+            const bookData = {
+                title: document.getElementById('bookTitle').value,
+                author: document.getElementById('bookAuthor').value,
+                price: parseFloat(document.getElementById('bookPrice').value),
+                original_price: parseFloat(document.getElementById('bookOriginalPrice').value) || null,
+                category: document.getElementById('bookCategory').value,
+                stock: parseInt(document.getElementById('bookStock').value),
+                image_url: document.getElementById('bookImage').value,
+                pdf_url: document.getElementById('bookPdfUrl').value || null,
+                description: document.getElementById('bookDescription').value,
+                is_bestseller: document.getElementById('bookIsBestseller').checked,
+            };
+
+            showLoading();
+            let result;
+            if (bookId) {
+                result = await books.update(bookId, bookData);
+            } else {
+                result = await books.create(bookData);
+            }
+            hideLoading();
+
+            if (result.success) {
+                showMessage('success', `বই সফলভাবে ${bookId ? 'আপডেট' : 'তৈরি'} হয়েছে।`);
+                closeModal();
+                loadPage('books');
+            } else {
+                showError(`ত্রুটি: ${result.message}`);
+            }
+        }
+
+        async function onOrderFormSubmit(e) {
+            e.preventDefault();
+            const orderId = document.getElementById('orderId').value;
+            if (!orderId) return;
+
+            const orderData = {
+                customer_details: {
+                    name: document.getElementById('orderCustomerName').value,
+                    phone: document.getElementById('orderCustomerPhone').value,
+                    email: document.getElementById('orderCustomerEmail').value,
+                    address: document.getElementById('orderCustomerAddress').value,
+                },
+                status: document.getElementById('orderStatus').value,
+                delivery_charge: parseFloat(document.getElementById('orderDeliveryCharge').value),
+                total_amount: parseFloat(document.getElementById('orderTotalAmount').textContent.replace('৳', '').replace(/,/g, ''))
+            };
+
+            showLoading();
+            const result = await orders.update(orderId, orderData);
+            hideLoading();
+
+            if (result.success) {
+                showMessage('success', 'অর্ডার সফলভাবে আপডেট হয়েছে।');
+                closeOrderModal();
+                loadPage('orders');
+            } else {
+                showError(`ত্রুটি: ${result.message}`);
+            }
+        }
+
+        async function onUserFormSubmit(e) {
+            e.preventDefault();
+            const userId = document.getElementById('userId').value;
+            const userData = {
+                name: document.getElementById('userName').value,
+                email: document.getElementById('userEmail').value,
+                role: document.getElementById('userRole').value,
+            };
+
+            const password = document.getElementById('userPassword').value;
+            if (password) {
+                userData.password = password;
+            }
+
+            showLoading();
+            let result;
+            if (userId) {
+                result = await admins.update(userId, { name: userData.name, role: userData.role });
+            } else {
+                result = await admins.create(userData);
+            }
+            hideLoading();
+
+            if (result.success) {
+                showMessage('success', `ব্যবহারকারী সফলভাবে ${userId ? 'আপডেট' : 'তৈরি'} হয়েছে।`);
+                closeUserModal();
+                loadPage('users');
+            } else {
+                showError(`ত্রুটি: ${result.message}`);
+            }
+        }
+
+        // --- CONFIRMATION MODAL ---
+        window.showConfirm = function(action, data, message) {
+            confirmAction = action;
+            confirmData = data;
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmModal').classList.add('active');
+        };
+
+        window.closeConfirmModal = function() {
+            document.getElementById('confirmModal').classList.remove('active');
+            confirmAction = null;
+            confirmData = null;
+        };
+
+        window.processConfirm = async function() {
+            if (!confirmAction) return;
+
+            showLoading();
+            let result;
+            try {
+                switch (confirmAction) {
+                    case 'deleteBook':
+                        result = await books.delete(confirmData);
+                        if (result.success) {
+                            showMessage('success', 'বই মুছে ফেলা হয়েছে।');
+                            loadPage('books');
+                        }
+                        break;
+                    case 'deleteCategory':
+                        result = await categories.delete(confirmData);
+                        if (result.success) {
+                            showMessage('success', 'ক্যাটাগরি মুছে ফেলা হয়েছে।');
+                            loadPage('categories');
+                        }
+                        break;
+                    case 'deleteUser':
+                        result = await admins.delete(confirmData);
+                        if (result.success) {
+                            showMessage('success', 'ব্যবহারকারী মুছে ফেলা হয়েছে।');
+                            loadPage('users');
+                        }
+                        break;
+                }
+
+                if (result && !result.success) {
+                    showError(`ত্রুটি: ${result.message}`);
+                }
+
+            } catch (error) {
+                showError(`ত্রুটি ঘটেছে: ${error.message}`);
+            } finally {
+                hideLoading();
+                closeConfirmModal();
+            }
+        };
+
+        // --- LOGOUT ---
+        window.logout = async function() {
+            showConfirm('logout', null, 'আপনি কি নিশ্চিতভাবে লগআউট করতে চান?');
+            // This is a special case for the confirmation modal
+            confirmAction = async () => {
+                await auth.logoutAdmin();
+            }
+            processConfirm = async () => {
+                await confirmAction();
             }
         };
         
+        // --- FILE UPLOAD ---
+        window.handleFileUpload = async function(input, targetId) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const targetInput = document.getElementById(targetId);
+            const originalPlaceholder = targetInput.placeholder;
+            targetInput.placeholder = 'আপলোড হচ্ছে...';
+            showLoading();
+
+            try {
+                const filePath = `public/${file.name.replace(/[^a-zA-Z0-9.]/g, '-')}`;
+                let { error: uploadError } = await supabase.storage.from('book-images').upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: true
+                });
+
+                if (uploadError) {
+                    throw uploadError;
+                }
+
+                const { data } = supabase.storage.from('book-images').getPublicUrl(filePath);
+                
+                targetInput.value = data.publicUrl;
+                showMessage('success', 'ফাইল সফলভাবে আপলোড হয়েছে।');
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                showError('ফাইল আপলোড করতে সমস্যা হয়েছে: ' + error.message);
+            } finally {
+                hideLoading();
+                targetInput.placeholder = originalPlaceholder;
+                input.value = ''; // Reset file input
+            }
+        };
     </script>
 </body>
 </html>

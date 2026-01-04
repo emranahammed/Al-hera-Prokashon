@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>স্মার্ট ইনভেন্টরি ও অ্যাকাউন্টস - প্রো ভার্সন</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
+    <!-- Firebase Libraries -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtiCRqpSeDD9T1LTPJN8zX7E-lFEO69cs",
+            authDomain: "enventory-bd354.firebaseapp.com",
+            projectId: "enventory-bd354",
+            storageBucket: "enventory-bd354.firebasestorage.app",
+            messagingSenderId: "842289799896",
+            appId: "1:842289799896:web:3bdcd348a296543a1eadad",
+            measurementId: "G-4PV0VQ7K81"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-shop-pro';
+
+        window.db = db;
+        window.appId = appId;
+        
+        signInAnonymously(auth).catch(console.error);
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.userId = user.uid;
+                loadDataFromCloud();
+            }
+        });
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Hind Siliguri', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .sidebar-active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r hidden md:flex flex-col no-print">
+        <div class="p-6">
+            <h1 class="text-2xl font-bold text-blue-600 flex items-center gap-2">
+                <i data-lucide="shield-check"></i> স্মার্ট শপ প্রো
+            </h1>
+        </div>
+        <nav class="flex-1 px-4 space-y-1">
+            <button onclick="switchTab('dashboard')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition sidebar-active" id="btn-dashboard">
+                <i data-lucide="home"></i> ড্যাশবোর্ড
+            </button>
+            <button onclick="switchTab('suppliers')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-suppliers">
+                <i data-lucide="users"></i> ভেন্ডর/সাপ্লায়ার
+            </button>
+            <button onclick="switchTab('inventory')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-inventory">
+                <i data-lucide="box"></i> ইনভেন্টরি
+            </button>
+            <button onclick="switchTab('pos')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-pos">
+                <i data-lucide="shopping-cart"></i> পিওএস (POS)
+            </button>
+            <button onclick="switchTab('reports')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-reports">
+                <i data-lucide="bar-chart-3"></i> সেলস রিপোর্ট
+            </button>
+            <button onclick="switchTab('accounts')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-accounts">
+                <i data-lucide="wallet"></i> আর্থিক হিসাব
+            </button>
+            <button onclick="switchTab('customers')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-customers">
+                <i data-lucide="users"></i> কাস্টমার
+            </button>
+        </nav>
+        <div class="p-4 border-t">
+            <div id="sync-status" class="text-xs text-center py-1 rounded bg-gray-100 text-gray-500 mb-2">Cloud Sync: Initializing...</div>
+            <button onclick="exportJSON()" class="w-full text-xs flex items-center justify-center gap-2 bg-gray-100 p-2 rounded hover:bg-gray-200">
+                <i data-lucide="download" class="w-3 h-3"></i> ব্যাকআপ ডাউনলোড
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto relative">
+        <div id="content-area" class="p-6">
+            <!-- Dynamic Content -->
+        </div>
+        <div id="toast" class="fixed bottom-5 right-5 bg-black text-white px-6 py-3 rounded-lg opacity-0 transition-opacity pointer-events-none no-print z-50"></div>
+    </main>
+</div>
+
+<script>
+    // --- State Management ---
+    let state = {
+        products: JSON.parse(localStorage.getItem('ss_products')) || [],
+        sales: JSON.parse(localStorage.getItem('ss_sales')) || [],
+        suppliers: JSON.parse(localStorage.getItem('ss_suppliers')) || [],
+        history: JSON.parse(localStorage.getItem('ss_history')) || [],
+        dueAccounts: JSON.parse(localStorage.getItem('ss_dues')) || { customer: 0, supplier: 0 },
+        cart: [],
+        customers: JSON.parse(localStorage.getItem('ss_customers')) || []
+    };
+
+    // --- Firebase Sync Logic ---
+    async function loadDataFromCloud() {
+        if (!window.db || !window.userId) return;
+        try {
+            const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+            const docRef = doc(window.db, 'artifacts', window.appId, 'users', window.userId, 'state', 'main');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                state = { ...state, ...docSnap.data() };
+                saveDataLocally();
+                updateSyncStatus("Cloud Synced ✅", "bg-green-100 text-green-600");
+                switchTab(currentTab);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function syncToCloud() {
+        if (!window.db || !window.userId) return;
+        updateSyncStatus("Syncing...", "bg-yellow-50 text-yellow-600");
+        try {
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+            const docRef = doc(window.db, 'artifacts', window.appId, 'users', window.userId, 'state', 'main');
+            await setDoc(docRef, { ...state, lastUpdated: new Date().toISOString() });
+            updateSyncStatus("Cloud Synced ✅", "bg-green-100 text-green-600");
+        } catch (e) { updateSyncStatus("Sync Failed", "bg-red-50 text-red-500"); }
+    }
+
+    function saveDataLocally() {
+        localStorage.setItem('ss_products', JSON.stringify(state.products));
+        localStorage.setItem('ss_suppliers', JSON.stringify(state.suppliers));
+        localStorage.setItem('ss_sales', JSON.stringify(state.sales));
+        localStorage.setItem('ss_history', JSON.stringify(state.history));
+        localStorage.setItem('ss_dues', JSON.stringify(state.dueAccounts));
+        localStorage.setItem('ss_customers', JSON.stringify(state.customers));
+    }
+
+    function saveData() {
+        saveDataLocally();
+        syncToCloud();
+    }
+
+    function updateSyncStatus(text, classes) {
+        const el = document.getElementById('sync-status');
+        if (el) { el.innerText = text; el.className = `text-xs text-center py-1 rounded mb-2 ${classes}`; }
+    }
+
+    // --- Tab Switching ---
+    let currentTab = 'dashboard';
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('sidebar-active'));
+        document.getElementById(`btn-${tab}`)?.classList.add('sidebar-active');
+        const area = document.getElementById('content-area');
+        
+        if (tab === 'dashboard') renderDashboard(area);
+        else if (tab === 'suppliers') renderSuppliers(area);
+        else if (tab === 'inventory') renderInventory(area);
+        else if (tab === 'pos') renderPOS(area);
+        else if (tab === 'reports') renderReports(area);
+        else if (tab === 'accounts') renderAccounts(area);
+        else if (tab === 'customers') renderCustomers(area);
+
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // --- Suppliers Logic ---
+    function renderSuppliers(container) {
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">ভেন্ডর/সাপ্লায়ার লিস্ট</h2>
+                <button onclick="toggleModal('vendor-modal')" class="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2">
+                    <i data-lucide="user-plus"></i> নতুন ভেন্ডর অ্যাড করুন
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                ${state.suppliers.map((v, idx) => `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="building-2"></i></div>
+                            <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${v.id}</span>
+                        </div>
+                        <h4 class="font-bold text-lg">${v.name}</h4>
+                        <p class="text-sm text-gray-500 mt-2">📞 ${v.phone}</p>
+                        <p class="text-sm text-gray-500">📍 ${v.address || 'ঠিকানা নেই'}</p>
+                        <div class="mt-4 pt-4 border-t flex justify-between">
+                            <span class="text-xs text-blue-600 font-bold">পণ্য: ${state.products.filter(p=>p.vendorId === v.id).length}টি</span>
+                            <button onclick="deleteVendor(${idx})" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন ভেন্ডর পাওয়া যায়নি।</div>'}
+            </div>
+
+            <!-- Vendor Modal -->
+            <div id="vendor-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <h3 class="text-xl font-bold mb-4">নতুন ভেন্ডর</h3>
+                    <form onsubmit="addVendor(event)" class="space-y-4">
+                        <input type="text" id="v-id" placeholder="ভেন্ডর আইডি (Unique)" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="v-name" placeholder="ভেন্ডর/কোম্পানির নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="v-phone" placeholder="ফোন নম্বর" class="w-full p-3 border rounded-xl outline-none" required>
+                        <textarea id="v-address" placeholder="ঠিকানা" class="w-full p-3 border rounded-xl outline-none"></textarea>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="toggleModal('vendor-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl">সেভ করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+    }
+
+    function addVendor(e) {
+        e.preventDefault();
+        const v = {
+            id: document.getElementById('v-id').value,
+            name: document.getElementById('v-name').value,
+            phone: document.getElementById('v-phone').value,
+            address: document.getElementById('v-address').value
+        };
+        if(state.suppliers.some(s=>s.id === v.id)) return showToast("এই আইডি ব্যবহার হয়েছে!");
+        state.suppliers.push(v);
+        saveData();
+        toggleModal('vendor-modal');
+        switchTab('suppliers');
+    }
+
+    function deleteVendor(idx) {
+        if(confirm("ভেন্ডরটি ডিলিট করতে চান?")) {
+            state.suppliers.splice(idx, 1);
+            saveData();
+            switchTab('suppliers');
+        }
+    }
+
+    // --- Inventory Logic ---
+    function renderInventoryTable(products) {
+        const tableBody = document.getElementById('inventory-table-body');
+        if (!tableBody) return;
+
+        tableBody.innerHTML = products.map(p => {
+            const vendor = state.suppliers.find(s => s.id === p.vendorId);
+            const originalIndex = state.products.findIndex(originalP => originalP.id === p.id);
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="p-4">
+                    <div class="font-bold text-gray-800">${p.name}</div>
+                    <div class="text-[10px] text-gray-400">ID: ${p.id}</div>
+                </td>
+                <td class="p-4 text-gray-600">${vendor ? vendor.name : 'Unknown'}</td>
+                <td class="p-4 text-center font-medium">৳${p.buyPrice}</td>
+                <td class="p-4 text-center font-bold text-blue-600">৳${p.sellPrice}</td>
+                <td class="p-4 text-center">
+                    <span class="px-3 py-1 rounded-full font-bold ${p.stock < 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">
+                        ${p.stock} টি
+                    </span>
+                </td>
+                <td class="p-4 text-right space-x-2">
+                    <button onclick="openEditModal(${originalIndex})" class="text-green-500 text-xs font-bold">ইডিট</button>
+                    <button onclick="adjustStock(${originalIndex})" class="text-blue-500 text-xs">স্টক+</button>
+                    <button onclick="deleteProduct(${originalIndex})" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="6" class="p-10 text-center text-gray-300">কোন পণ্য পাওয়া যায়নি।</td></tr>';
+    }
+
+    function handleInventorySearch(term) {
+        const lowerCaseTerm = term.toLowerCase().trim();
+        if (!lowerCaseTerm) {
+            renderInventoryTable(state.products);
+            return;
+        }
+        const filteredProducts = state.products.filter(p => {
+            const vendor = state.suppliers.find(s => s.id === p.vendorId);
+            const vendorName = vendor ? vendor.name.toLowerCase() : '';
+            return p.name.toLowerCase().includes(lowerCaseTerm) ||
+                   p.id.toLowerCase().includes(lowerCaseTerm) ||
+                   vendorName.includes(lowerCaseTerm);
+        });
+        renderInventoryTable(filteredProducts);
+    }
+
+    function renderInventory(container) {
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">ইনভেন্টরি ম্যানেজমেন্ট</h2>
+                <button onclick="toggleModal('product-modal')" class="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2">
+                    <i data-lucide="package-plus"></i> নতুন পণ্য যুক্ত করুন
+                </button>
+            </div>
+            
+            <div class="mb-4">
+                <input type="text" id="inventory-search" oninput="handleInventorySearch(this.value)" placeholder="পণ্যের নাম, আইডি বা ভেন্ডর দিয়ে খুঁজুন..." class="w-full p-3 border rounded-xl outline-none">
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border overflow-hidden overflow-x-auto">
+                <table class="w-full text-left text-sm min-w-[800px]">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4">আইডি ও নাম</th>
+                            <th class="p-4">ভেন্ডর</th>
+                            <th class="p-4 text-center">ক্রয়মূল্য</th>
+                            <th class="p-4 text-center">বিক্রয়মূল্য</th>
+                            <th class="p-4 text-center">স্টক</th>
+                            <th class="p-4 text-right">অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-table-body" class="divide-y">
+                        <!-- Table content will be rendered here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Product Modal -->
+            <div id="product-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6">
+                    <h3 class="text-xl font-bold mb-6">নতুন পণ্য ইনপুট</h3>
+                    <form onsubmit="addProduct(event)" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <input type="text" id="p-id" placeholder="পণ্য আইডি" class="p-3 border rounded-xl outline-none" required>
+                            <input type="text" id="p-name" placeholder="পণ্যের নাম" class="p-3 border rounded-xl outline-none" required>
+                        </div>
+                        <select id="p-vendor" class="w-full p-3 border rounded-xl outline-none" required>
+                            <option value="">ভেন্ডর সিলেক্ট করুন</option>
+                            ${state.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                        </select>
+                        <div class="grid grid-cols-3 gap-4">
+                            <input type="number" id="p-buy" placeholder="ক্রয়মূল্য" class="p-3 border rounded-xl outline-none" required>
+                            <input type="number" id="p-sell" placeholder="বিক্রয়মূল্য" class="p-3 border rounded-xl outline-none" required>
+                            <input type="number" id="p-stock" placeholder="পরিমাণ (Qty)" class="p-3 border rounded-xl outline-none" required>
+                        </div>
+                        <div class="flex justify-end gap-3 pt-4">
+                            <button type="button" onclick="toggleModal('product-modal')" class="text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">সেভ করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit Product Modal -->
+            <div id="edit-product-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6">
+                    <h3 class="text-xl font-bold mb-6">পণ্য ইডিট করুন</h3>
+                    <form onsubmit="updateProduct(event)" class="space-y-4">
+                        <input type="hidden" id="edit-p-index">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-sm font-bold text-gray-500">পণ্য আইডি (Read-only)</label>
+                                <input type="text" id="edit-p-id" class="p-3 border rounded-xl outline-none w-full bg-gray-100" readonly>
+                            </div>
+                            <div>
+                                <label class="text-sm font-bold">পণ্যের নাম</label>
+                                <input type="text" id="edit-p-name" placeholder="পণ্যের নাম" class="p-3 border rounded-xl outline-none w-full" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-bold">ভেন্ডর</label>
+                            <select id="edit-p-vendor" class="w-full p-3 border rounded-xl outline-none" required>
+                                <option value="">ভেন্ডর সিলেক্ট করুন</option>
+                                ${state.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                <label class="text-sm font-bold">ক্রয়মূল্য</label>
+                                <input type="number" step="any" id="edit-p-buy" placeholder="ক্রয়মূল্য" class="p-3 border rounded-xl outline-none w-full" required>
+                            </div>
+                            <div>
+                                <label class="text-sm font-bold">বিক্রয়মূল্য</label>
+                                <input type="number" step="any" id="edit-p-sell" placeholder="বিক্রয়মূল্য" class="p-3 border rounded-xl outline-none w-full" required>
+                            </div>
+                        </div>
+                        <div class="flex justify-end gap-3 pt-4">
+                            <button type="button" onclick="toggleModal('edit-product-modal')" class="text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">আপডেট করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        renderInventoryTable(state.products);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function addProduct(e) {
+        e.preventDefault();
+        const p = {
+            id: document.getElementById('p-id').value,
+            name: document.getElementById('p-name').value,
+            vendorId: document.getElementById('p-vendor').value,
+            buyPrice: parseFloat(document.getElementById('p-buy').value),
+            sellPrice: parseFloat(document.getElementById('p-sell').value),
+            stock: parseInt(document.getElementById('p-stock').value)
+        };
+        if(state.products.some(item=>item.id === p.id)) return showToast("এই আইডি ব্যবহার হয়েছে!");
+        state.products.push(p);
+        saveData();
+        toggleModal('product-modal');
+        switchTab('inventory');
+    }
+
+    function deleteProduct(idx) {
+        if(confirm("ডিলিট করতে চান?")) {
+            state.products.splice(idx, 1);
+            saveData();
+            switchTab('inventory');
+        }
+    }
+
+    function adjustStock(idx) {
+        const val = prompt("অতিরিক্ত কত পিস যোগ হবে?");
+        if(val && !isNaN(val)) {
+            state.products[idx].stock += parseInt(val);
+            state.history.unshift({ date: new Date().toISOString(), type: 'Stock In', product: state.products[idx].name, qty: parseInt(val) });
+            saveData();
+            switchTab('inventory');
+        }
+    }
+
+    function openEditModal(index) {
+        const product = state.products[index];
+        if (!product) return;
+
+        document.getElementById('edit-p-index').value = index;
+        document.getElementById('edit-p-id').value = product.id;
+        document.getElementById('edit-p-name').value = product.name;
+        document.getElementById('edit-p-vendor').value = product.vendorId;
+        document.getElementById('edit-p-buy').value = product.buyPrice;
+        document.getElementById('edit-p-sell').value = product.sellPrice;
+
+        toggleModal('edit-product-modal');
+    }
+
+    function updateProduct(e) {
+        e.preventDefault();
+        const index = document.getElementById('edit-p-index').value;
+        if (index === '' || index === undefined) return;
+
+        const product = state.products[index];
+        if (!product) return;
+
+        product.name = document.getElementById('edit-p-name').value;
+        product.vendorId = document.getElementById('edit-p-vendor').value;
+        product.buyPrice = parseFloat(document.getElementById('edit-p-buy').value);
+        product.sellPrice = parseFloat(document.getElementById('edit-p-sell').value);
+
+        saveData();
+        toggleModal('edit-product-modal');
+        switchTab('inventory');
+        showToast("প্রোডাক্ট আপডেট হয়েছে।");
+    }
+
+    // --- POS Logic ---
+    let currentSelectedProductId = null; // To store the product ID being processed
+
+    function openPosQtyModal(productId) {
+        const product = state.products.find(p => p.id === productId);
+        if (!product || product.stock <= 0) {
+            showToast("এই পণ্যটি স্টক আউট!");
+            return;
+        }
+
+        currentSelectedProductId = productId;
+        document.getElementById('pos-qty-product-name').innerText = product.name;
+        document.getElementById('pos-qty-product-stock').innerText = product.stock;
+        
+        const qtyInput = document.getElementById('pos-quantity-input');
+        qtyInput.value = 1; // Default quantity
+        qtyInput.max = product.stock; // Set max quantity
+        qtyInput.min = 1; // Ensure minimum is 1
+
+        toggleModal('pos-qty-modal');
+    }
+
+    function addSelectedQuantityToCart() {
+        const productId = currentSelectedProductId;
+        const quantityInput = document.getElementById('pos-quantity-input');
+        const quantity = parseInt(quantityInput.value);
+
+        if (isNaN(quantity) || quantity <= 0) {
+            showToast("সঠিক পরিমাণ দিন!");
+            return;
+        }
+
+        const product = state.products.find(p => p.id === productId);
+        if (!product) {
+            showToast("পণ্যটি খুঁজে পাওয়া যায়নি!");
+            return;
+        }
+
+        const existing = state.cart.find(c => c.id === productId);
+        const currentCartQty = existing ? existing.qty : 0;
+
+        if (quantity + currentCartQty > product.stock) {
+            showToast(`স্টকে পর্যাপ্ত পণ্য নেই। সর্বোচ্চ ${product.stock} টি, কার্টে আছে ${currentCartQty} টি।`);
+            return;
+        }
+        
+        if (existing) {
+            existing.qty += quantity;
+        } else {
+            state.cart.push({...product, qty: quantity});
+        }
+
+        toggleModal('pos-qty-modal'); // Close the modal
+        updateCartUI(); // Refresh cart display
+        showToast(`${quantity}x ${product.name} কার্টে যোগ হয়েছে!`);
+    }
+
+    function renderPOS(container) {
+        container.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2">
+                    <div class="bg-white p-4 rounded-2xl border mb-4">
+                        <input type="text" id="pos-search" placeholder="নাম বা আইডি লিখে সার্চ..." class="w-full p-3 border rounded-xl outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="pos-grid"></div>
+                </div>
+                <div class="bg-white rounded-2xl border p-4 flex flex-col h-[600px]">
+                    <h3 class="font-bold border-b pb-2 mb-4">কার্ট লিস্ট</h3>
+                    <div class="flex-1 overflow-y-auto space-y-3" id="cart-list"></div>
+                    <div class="border-t pt-4 mt-4 space-y-2">
+                        <div class="flex justify-between"><span>মোট:</span> <span id="pos-total" class="font-black text-xl">৳0</span></div>
+                        <button onclick="checkout()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">অর্ডার কনফার্ম</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POS Quantity Modal -->
+            <div id="pos-qty-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+                    <h3 class="text-xl font-bold mb-4" id="pos-qty-product-name"></h3>
+                    <p class="text-gray-600 mb-4">স্টক: <span id="pos-qty-product-stock" class="font-bold"></span> টি</p>
+                    <input type="hidden" id="pos-qty-product-id">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="pos-quantity-input" class="block text-sm font-medium text-gray-700">পরিমাণ</label>
+                            <input type="number" id="pos-quantity-input" min="1" value="1" class="w-full p-3 border rounded-xl outline-none mt-1" required>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="toggleModal('pos-qty-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                            <button type="button" onclick="addSelectedQuantityToCart()" class="bg-blue-600 text-white px-6 py-2 rounded-xl">কার্টে যোগ করুন</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        const searchEl = document.getElementById('pos-search');
+        searchEl.addEventListener('input', (e) => {
+            const filtered = state.products.filter(p => p.name.toLowerCase().includes(e.target.value.toLowerCase()) || p.id.includes(e.target.value));
+            renderPOSGrid(filtered);
+        });
+        renderPOSGrid(state.products);
+        updateCartUI();
+    }
+
+    function renderPOSGrid(list) {
+        const grid = document.getElementById('pos-grid');
+        grid.innerHTML = list.map(p => `
+            <div onclick="openPosQtyModal('${p.id}')" class="bg-white p-4 rounded-2xl border cursor-pointer hover:border-blue-500 ${p.stock <= 0 ? 'opacity-50 opacity-100 cursor-not-allowed' : ''}">
+                <p class="font-bold truncate">${p.name}</p>
+                <div class="flex justify-between mt-2">
+                    <span class="text-blue-600 font-bold">৳${p.sellPrice}</span>
+                    <span class="text-[10px] text-gray-400">স্টক: ${p.stock}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function updateCartUI() {
+        const list = document.getElementById('cart-list');
+        list.innerHTML = state.cart.map((c, i) => `
+            <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                <div class="text-xs w-full">
+                    <p class="font-bold">${c.name}</p>
+                    <div class="flex items-center justify-between mt-1">
+                        <div class="flex items-center">
+                            <button onclick="changeCartItemQuantity(${i}, -1)" class="text-gray-600 bg-gray-200 px-2 py-0.5 rounded-md hover:bg-gray-300">-</button>
+                            <span class="mx-2 font-medium">${c.qty}</span>
+                            <button onclick="changeCartItemQuantity(${i}, 1)" class="text-gray-600 bg-gray-200 px-2 py-0.5 rounded-md hover:bg-gray-300">+</button>
+                        </div>
+                        <span class="font-bold">৳${(c.sellPrice * c.qty).toLocaleString()}</span>
+                    </div>
+                </div>
+                <button onclick="removeCartItem(${i})" class="text-red-400 ml-2">×</button>
+            </div>
+        `).join('');
+        const total = state.cart.reduce((acc, c) => acc + (c.sellPrice * c.qty), 0);
+        document.getElementById('pos-total').innerText = `৳${total.toLocaleString()}`;
+    }
+
+    function changeCartItemQuantity(index, delta) {
+        const item = state.cart[index];
+        if (!item) return;
+
+        const newQty = item.qty + delta;
+        
+        if (newQty <= 0) {
+            // If quantity becomes 0 or less, remove the item
+            removeCartItem(index);
+            return;
+        }
+
+        const productInStock = state.products.find(p => p.id === item.id);
+        if (productInStock && newQty > productInStock.stock) {
+            showToast(`স্টকে পর্যাপ্ত পণ্য নেই। সর্বোচ্চ ${productInStock.stock} টি যোগ করতে পারবেন।`);
+            return;
+        }
+
+        item.qty = newQty;
+        updateCartUI();
+    }
+
+    function removeCartItem(index) {
+        if(confirm("এই আইটেমটি কার্ট থেকে সরাতে চান?")) {
+            state.cart.splice(index, 1);
+            updateCartUI();
+        }
+    }
+
+    function checkout() {
+        if(state.cart.length === 0) return;
+        const total = state.cart.reduce((acc, c) => acc + (c.sellPrice * c.qty), 0);
+        const sale = {
+            id: 'INV-'+Date.now(),
+            date: new Date().toISOString(),
+            items: [...state.cart],
+            total: total
+        };
+        state.cart.forEach(item => {
+            const p = state.products.find(x => x.id === item.id);
+            p.stock -= item.qty;
+            state.history.unshift({ date: sale.date, type: 'Sale', product: item.name, qty: item.qty });
+        });
+        state.sales.push(sale);
+        state.cart = [];
+        saveData();
+        showToast("অর্ডার সফল!");
+        switchTab('pos');
+    }
+
+    // --- Reports Logic ---
+    function renderReports(container) {
+        const today = new Date().toISOString().split('T')[0];
+        const thisMonth = today.substring(0, 7);
+
+        const dailySales = state.sales.filter(s => s.date.startsWith(today));
+        const dailyTotal = dailySales.reduce((acc, s) => acc + s.total, 0);
+
+        const monthlySales = state.sales.filter(s => s.date.startsWith(thisMonth));
+        const monthlyTotal = monthlySales.reduce((acc, s) => acc + s.total, 0);
+
+        container.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6">সেলস রিপোর্ট</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-3xl text-white">
+                    <p class="opacity-80 font-bold">আজকের বিক্রি (${today})</p>
+                    <h3 class="text-4xl font-black mt-2">৳${dailyTotal.toLocaleString()}</h3>
+                    <p class="text-xs mt-2">মোট ইনভয়েস: ${dailySales.length} টি</p>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-3xl text-white">
+                    <p class="opacity-80 font-bold">এই মাসের বিক্রি (${new Date().toLocaleString('default', { month: 'long' })})</p>
+                    <h3 class="text-4xl font-black mt-2">৳${monthlyTotal.toLocaleString()}</h3>
+                    <p class="text-xs mt-2">মোট ইনভয়েস: ${monthlySales.length} টি</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border shadow-sm p-6">
+                <h4 class="font-bold mb-4">সাম্প্রতিক বিক্রয় তালিকা</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 border-b">
+                            <tr><th class="p-3 text-left">ইনভয়েস</th><th class="p-3 text-left">তারিখ</th><th class="p-3 text-right">টাকা</th></tr>
+                        </thead>
+                        <tbody class="divide-y">
+                            ${state.sales.slice().reverse().map(s => `
+                                <tr>
+                                    <td class="p-3 font-mono text-xs">${s.id}</td>
+                                    <td class="p-3 text-gray-500">${new Date(s.date).toLocaleString()}</td>
+                                    <td class="p-3 text-right font-bold">৳${s.total}</td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="3" class="p-10 text-center text-gray-300">কোন সেলস ডাটা নেই</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // --- Dashboard Logic ---
+    function renderDashboard(container) {
+        const totalSales = state.sales.reduce((acc, s) => acc + s.total, 0);
+        const stockVal = state.products.reduce((acc, p) => acc + (p.buyPrice * p.stock), 0);
+        
+        container.innerHTML = `
+            <div class="mb-8">
+                <h2 class="text-3xl font-black text-gray-800">ওভারভিউ</h2>
+                <p class="text-gray-500">আজকের ব্যবসার সংক্ষিপ্ত সারসংক্ষেপ</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                    <p class="text-xs font-bold text-gray-400 uppercase">মোট বিক্রি</p>
+                    <h3 class="text-3xl font-black text-blue-600">৳${totalSales.toLocaleString()}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                    <p class="text-xs font-bold text-gray-400 uppercase">স্টক ইনভেস্টমেন্ট</p>
+                    <h3 class="text-3xl font-black text-gray-800">৳${stockVal.toLocaleString()}</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                    <p class="text-xs font-bold text-gray-400 uppercase">মোট ভেন্ডর</p>
+                    <h3 class="text-3xl font-black text-gray-800">${state.suppliers.length} জন</h3>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                <h4 class="font-bold text-red-500 mb-4 flex items-center gap-2"><i data-lucide="alert-circle"></i> লো-স্টক এলার্ট</h4>
+                <div class="space-y-3">
+                    ${state.products.filter(p => p.stock < 5).map(p => `
+                        <div class="flex justify-between p-3 bg-red-50 rounded-xl">
+                            <span class="font-bold">${p.name}</span>
+                            <span class="text-red-600 font-bold">${p.stock} টি বাকি</span>
+                        </div>
+                    `).join('') || '<p class="text-gray-400 text-sm">সব পর্যাপ্ত পরিমাণে আছে।</p>'}
+                </div>
+            </div>
+        `;
+    }
+
+    // --- Financials ---
+    function renderAccounts(container) {
+        container.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-3xl border shadow-lg text-center">
+                    <p class="text-red-500 font-bold mb-2">কাস্টমার বাকি</p>
+                    <h1 class="text-5xl font-black mb-6">৳${state.dueAccounts.customer.toLocaleString()}</h1>
+                    <div class="flex gap-2"><input type="number" id="pay-c" placeholder="টাকা" class="flex-1 p-3 border rounded-xl outline-none"><button onclick="updateDue('customer', -1)" class="bg-red-500 text-white px-6 rounded-xl">আদায়</button></div>
+                </div>
+                <div class="bg-white p-8 rounded-3xl border shadow-lg text-center">
+                    <p class="text-blue-600 font-bold mb-2">সাপ্লায়ার দেনা</p>
+                    <h1 class="text-5xl font-black mb-6">৳${state.dueAccounts.supplier.toLocaleString()}</h1>
+                    <div class="flex gap-2"><input type="number" id="pay-s" placeholder="টাকা" class="flex-1 p-3 border rounded-xl outline-none"><button onclick="updateDue('supplier', -1)" class="bg-blue-600 text-white px-6 rounded-xl">পরিশোধ</button></div>
+                </div>
+            </div>
+        `;
+    }
+
+    function updateDue(type, mult) {
+        const val = parseFloat(document.getElementById(type === 'customer' ? 'pay-c' : 'pay-s').value || 0);
+        state.dueAccounts[type] += (val * mult);
+        saveData();
+        switchTab('accounts');
+    }
+
+    // --- Customer Logic ---
+    function renderCustomers(container) {
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">কাস্টমার লিস্ট</h2>
+                <button onclick="toggleModal('add-customer-modal')" class="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2">
+                    <i data-lucide="user-plus"></i> নতুন কাস্টমার অ্যাড করুন
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                ${state.customers.map((c, idx) => `
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="user"></i></div>
+                            <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${c.id}</span>
+                        </div>
+                        <h4 class="font-bold text-lg">${c.name}</h4>
+                        <p class="text-sm text-gray-500 mt-2">📞 ${c.phone}</p>
+                        <p class="text-sm text-gray-500">📧 ${c.email || 'নেই'}</p>
+                        <p class="text-sm text-gray-500">🏠 ${c.address || 'নেই'}</p>
+                        <p class="text-sm text-gray-500">🏢 ${c.shopName || 'নেই'}</p>
+                        <div class="mt-4 pt-4 border-t flex justify-between items-center">
+                            <div class="space-x-2">
+                                <button onclick="openEditCustomerModal(${idx})" class="text-green-500 text-xs font-bold">ইডিট</button>
+                                <button onclick="deleteCustomer(${idx})" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                            </div>
+                            ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g,'')}" target="_blank" class="text-blue-500 text-xs flex items-center gap-1">
+                                <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp
+                            </a>` : ''}
+                        </div>
+                    </div>
+                `).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন কাস্টমার পাওয়া যায়নি।</div>'}
+            </div>
+
+            <!-- Add Customer Modal -->
+            <div id="add-customer-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6">
+                    <h3 class="text-xl font-bold mb-6">নতুন কাস্টমার অ্যাড করুন</h3>
+                    <form onsubmit="addCustomer(event)" class="space-y-4">
+                        <input type="text" id="cust-id" placeholder="কাস্টমার আইডি (Unique)" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="cust-name" placeholder="কাস্টমারের নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="cust-phone" placeholder="ফোন নম্বর (WhatsApp জন্য)" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="email" id="cust-email" placeholder="ইমেইল (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <input type="text" id="cust-address" placeholder="ঠিকানা (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <input type="text" id="cust-shop-name" placeholder="দোকানের নাম (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <div class="flex justify-end gap-3 pt-4">
+                            <button type="button" onclick="toggleModal('add-customer-modal')" class="text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">সেভ করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit Customer Modal -->
+            <div id="edit-customer-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-lg p-6">
+                    <h3 class="text-xl font-bold mb-6">কাস্টমার ইডিট করুন</h3>
+                    <form onsubmit="updateCustomerDetails(event)" class="space-y-4">
+                        <input type="hidden" id="edit-cust-index">
+                        <div>
+                            <label class="text-sm font-bold text-gray-500">কাস্টমার আইডি (Read-only)</label>
+                            <input type="text" id="edit-cust-id" class="p-3 border rounded-xl outline-none w-full bg-gray-100" readonly>
+                        </div>
+                        <input type="text" id="edit-cust-name" placeholder="কাস্টমারের নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="edit-cust-phone" placeholder="ফোন নম্বর (WhatsApp জন্য)" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="email" id="edit-cust-email" placeholder="ইমেইল (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <input type="text" id="edit-cust-address" placeholder="ঠিকানা (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <input type="text" id="edit-cust-shop-name" placeholder="দোকানের নাম (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none">
+                        <div class="flex justify-end gap-3 pt-4">
+                            <button type="button" onclick="toggleModal('edit-customer-modal')" class="text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold">আপডেট করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function addCustomer(e) {
+        e.preventDefault();
+        const c = {
+            id: document.getElementById('cust-id').value,
+            name: document.getElementById('cust-name').value,
+            phone: document.getElementById('cust-phone').value,
+            email: document.getElementById('cust-email').value,
+            address: document.getElementById('cust-address').value,
+            shopName: document.getElementById('cust-shop-name').value
+        };
+        if(state.customers.some(cust => cust.id === c.id)) return showToast("এই আইডি ব্যবহার হয়েছে!");
+        state.customers.push(c);
+        saveData();
+        toggleModal('add-customer-modal');
+        switchTab('customers');
+        showToast("কাস্টমার যোগ হয়েছে!");
+    }
+
+    function openEditCustomerModal(index) {
+        const customer = state.customers[index];
+        if (!customer) return;
+
+        document.getElementById('edit-cust-index').value = index;
+        document.getElementById('edit-cust-id').value = customer.id;
+        document.getElementById('edit-cust-name').value = customer.name;
+        document.getElementById('edit-cust-phone').value = customer.phone;
+        document.getElementById('edit-cust-email').value = customer.email;
+        document.getElementById('edit-cust-address').value = customer.address;
+        document.getElementById('edit-cust-shop-name').value = customer.shopName;
+
+        toggleModal('edit-customer-modal');
+    }
+
+    function updateCustomerDetails(e) {
+        e.preventDefault();
+        const index = document.getElementById('edit-cust-index').value;
+        if (index === '' || index === undefined) return;
+
+        const customer = state.customers[index];
+        if (!customer) return;
+
+        customer.name = document.getElementById('edit-cust-name').value;
+        customer.phone = document.getElementById('edit-cust-phone').value;
+        customer.email = document.getElementById('edit-cust-email').value;
+        customer.address = document.getElementById('edit-cust-address').value;
+        customer.shopName = document.getElementById('edit-cust-shop-name').value;
+
+        saveData();
+        toggleModal('edit-customer-modal');
+        switchTab('customers');
+        showToast("কাস্টমার আপডেট হয়েছে!");
+    }
+
+    function deleteCustomer(index) {
+        if(confirm("এই কাস্টমারকে ডিলিট করতে চান?")) {
+            state.customers.splice(index, 1);
+            saveData();
+            switchTab('customers');
+            showToast("কাস্টমার ডিলিট হয়েছে!");
+        }
+    }
+
+    // --- Utilities ---
+    function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.classList.replace('opacity-0', 'opacity-100');
+        setTimeout(() => t.classList.replace('opacity-100', 'opacity-0'), 2000);
+    }
+    function exportJSON() {
+        const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+        const a = document.createElement('a'); a.href = data; a.download = "shop_backup.json"; a.click();
+    }
+
+    window.onload = () => {
+        switchTab('dashboard');
+        setTimeout(() => { if(typeof lucide !== 'undefined') lucide.createIcons(); }, 500);
+    };
+</script>
+
+</body>
+</html>
