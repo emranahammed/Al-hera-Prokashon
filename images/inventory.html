@@ -86,6 +86,9 @@
             <button onclick="switchTab('reports')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-reports">
                 <i data-lucide="bar-chart-3"></i> সেলস রিপোর্ট
             </button>
+            <button onclick="switchTab('order-history')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-order-history">
+                <i data-lucide="history"></i> অর্ডার হিস্টোরি
+            </button>
             <button onclick="switchTab('accounts')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-accounts">
                 <i data-lucide="wallet"></i> আর্থিক হিসাব
             </button>
@@ -181,10 +184,148 @@
         else if (tab === 'inventory') renderInventory(area);
         else if (tab === 'pos') renderPOS(area);
         else if (tab === 'reports') renderReports(area);
+        else if (tab === 'order-history') renderOrderHistory(area);
         else if (tab === 'accounts') renderAccounts(area);
         else if (tab === 'customers') renderCustomers(area);
 
         if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // --- Order History Logic ---
+    function renderOrderHistory(container) {
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">অর্ডার হিস্টোরি</h2>
+            </div>
+            
+            <div class="bg-white rounded-2xl shadow-sm border overflow-hidden overflow-x-auto">
+                <table class="w-full text-left text-sm min-w-[900px]">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4">ইনভয়েস ID</th>
+                            <th class="p-4">তারিখ</th>
+                            <th class="p-4">কাস্টমার</th>
+                            <th class="p-4 text-center">মোট</th>
+                            <th class="p-4 text-center">পরিশোধিত</th>
+                            <th class="p-4 text-center">বাকি</th>
+                            <th class="p-4 text-right">অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        ${state.sales.slice().reverse().map(sale => {
+                            const customer = state.customers.find(c => c.id === sale.customerId) || { name: 'N/A' };
+                            return `
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-4 font-mono text-xs">${sale.id}</td>
+                                <td class="p-4">${new Date(sale.date).toLocaleDateString('bn-BD')}</td>
+                                <td class="p-4">${customer.name}</td>
+                                <td class="p-4 text-center font-bold">৳${sale.total.toLocaleString()}</td>
+                                <td class="p-4 text-center text-green-600">৳${(sale.paidAmount || 0).toLocaleString()}</td>
+                                <td class="p-4 text-center text-red-600">৳${(sale.dueAmount || 0).toLocaleString()}</td>
+                                <td class="p-4 text-right">
+                                    <button onclick="openInvoiceModal('${sale.id}')" class="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">
+                                        ইনভয়েস দেখুন
+                                    </button>
+                                </td>
+                            </tr>
+                            `;
+                        }).join('') || '<tr><td colspan="7" class="p-10 text-center text-gray-300">কোন অর্ডার পাওয়া যায়নি।</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Invoice Modal -->
+            <div id="invoice-modal" class="hidden fixed inset-0 bg-gray-50 flex items-center justify-center z-50 p-4">
+                <div id="invoice-content" class="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto">
+                    <!-- Invoice content will be dynamically inserted here -->
+                </div>
+                <div class="absolute top-4 right-4 no-print">
+                    <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-lg shadow-lg hover:bg-blue-700">প্রিন্ট করুন</button>
+                    <button onclick="toggleModal('invoice-modal')" class="bg-red-500 text-white px-6 py-2 rounded-lg shadow-lg hover:bg-red-600 ml-2">বন্ধ করুন</button>
+                </div>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function openInvoiceModal(saleId) {
+        const sale = state.sales.find(s => s.id === saleId);
+        if (!sale) return;
+
+        const customer = state.customers.find(c => c.id === sale.customerId) || {};
+        const invoiceContainer = document.getElementById('invoice-content');
+
+        invoiceContainer.innerHTML = `
+            <div class="p-8 printable-area">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <h1 class="text-3xl font-black text-blue-600">আল হেরা প্রকাশন</h1>
+                        <p class="text-gray-500">ইসলামী টাওয়ার, বাংলাবাজার, ঢাকা</p>
+                    </div>
+                    <div class="text-right">
+                        <h2 class="text-xl font-bold">ইনভয়েস</h2>
+                        <p class="text-sm text-gray-500 font-mono">${sale.id}</p>
+                        <p class="text-sm text-gray-500">${new Date(sale.date).toLocaleDateString('bn-BD')}</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg mb-8">
+                    <h3 class="font-bold mb-2">কাস্টমার:</h3>
+                    <p class="font-semibold">${customer.name || 'N/A'}</p>
+                    <p class="text-sm text-gray-600">${customer.phone || ''}</p>
+                    <p class="text-sm text-gray-600">${customer.address || ''}</p>
+                </div>
+
+                <table class="w-full text-left mb-8">
+                    <thead>
+                        <tr class="bg-gray-800 text-white">
+                            <th class="p-3">#</th>
+                            <th class="p-3">পণ্যের বিবরণ</th>
+                            <th class="p-3 text-center">পরিমাণ</th>
+                            <th class="p-3 text-right">মূল্য</th>
+                            <th class="p-3 text-right">মোট</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sale.items.map((item, index) => `
+                        <tr class="border-b">
+                            <td class="p-3">${index + 1}</td>
+                            <td class="p-3">${item.name}</td>
+                            <td class="p-3 text-center">${item.qty}</td>
+                            <td class="p-3 text-right">৳${item.sellPrice.toLocaleString()}</td>
+                            <td class="p-3 text-right font-bold">৳${(item.qty * item.sellPrice).toLocaleString()}</td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="flex justify-end">
+                    <div class="w-full max-w-xs space-y-2">
+                        <div class="flex justify-between">
+                            <span class="font-medium">সাব-টোটাল:</span>
+                            <span>৳${sale.total.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-xl border-t pt-2">
+                            <span>সর্বমোট:</span>
+                            <span>৳${sale.total.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between text-green-600">
+                            <span>পরিশোধিত:</span>
+                            <span>৳${(sale.paidAmount || 0).toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-red-600">
+                            <span>বাকি:</span>
+                            <span>৳${(sale.dueAmount || 0).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                 <div class="text-center mt-12 text-xs text-gray-500">
+                    <p>ধন্যবাদ আমাদের সাথে থাকার জন্য।</p>
+                </div>
+            </div>
+        `;
+        
+        toggleModal('invoice-modal');
     }
 
     // --- Suppliers Logic ---
