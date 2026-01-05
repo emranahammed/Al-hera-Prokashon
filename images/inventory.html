@@ -568,6 +568,49 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Checkout Modal -->
+            <div id="checkout-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-2xl p-6">
+                    <h3 class="text-2xl font-bold mb-6">অর্ডার কনফার্ম করুন</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Customer Details -->
+                        <div class="space-y-4">
+                            <h4 class="font-bold text-lg">কাস্টমার ডিটেইলস</h4>
+                            <div class="relative">
+                                <input type="text" id="checkout-customer-search" oninput="handleCustomerSearch(this.value)" placeholder="বিদ্যমান কাস্টমার খুঁজুন (নাম/ফোন)" class="w-full p-3 border rounded-xl outline-none">
+                                <div id="customer-search-results" class="absolute top-full left-0 right-0 bg-white border rounded-b-xl z-10 max-h-40 overflow-y-auto"></div>
+                            </div>
+                            <input type="hidden" id="checkout-customer-id">
+                            <input type="text" id="checkout-customer-name" placeholder="কাস্টমারের নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                            <input type="text" id="checkout-customer-phone" placeholder="ফোন নম্বর" class="w-full p-3 border rounded-xl outline-none" required>
+                            <textarea id="checkout-customer-address" placeholder="ঠিকানা (ঐচ্ছিক)" class="w-full p-3 border rounded-xl outline-none"></textarea>
+                        </div>
+
+                        <!-- Payment Details -->
+                        <div class="space-y-4 bg-gray-50 p-6 rounded-2xl">
+                            <h4 class="font-bold text-lg">পেমেন্ট</h4>
+                            <div class="flex justify-between items-center text-xl">
+                                <span class="text-gray-600">মোট বিল:</span>
+                                <span class="font-black">৳<span id="checkout-total-amount">0</span></span>
+                            </div>
+                            <div class="space-y-2">
+                                <label for="checkout-paid-amount" class="font-medium">টাকা গ্রহণ</label>
+                                <input type="number" id="checkout-paid-amount" oninput="handleCheckoutPayment()" class="w-full p-4 border rounded-xl outline-none text-2xl font-bold text-center" required>
+                            </div>
+                            <div class="flex justify-between items-center text-xl text-red-600">
+                                <span class="font-medium">বাকি (Due):</span>
+                                <span class="font-black">৳<span id="checkout-due-amount">0</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-6 mt-6 border-t">
+                        <button type="button" onclick="toggleModal('checkout-modal')" class="text-gray-500 px-6 py-3 rounded-xl">বাতিল</button>
+                        <button type="button" onclick="confirmOrder()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold text-lg">অর্ডার কনফার্ম করুন</button>
+                    </div>
+                </div>
+            </div>
         `;
         const searchEl = document.getElementById('pos-search');
         searchEl.addEventListener('input', (e) => {
@@ -592,8 +635,10 @@
     }
 
     function updateCartUI() {
-        const list = document.getElementById('cart-list');
-        list.innerHTML = state.cart.map((c, i) => `
+        const cartList = document.getElementById('cart-list');
+        if (!cartList) return;
+        
+        cartList.innerHTML = state.cart.map((c, i) => `
             <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                 <div class="text-xs w-full">
                     <p class="font-bold">${c.name}</p>
@@ -620,7 +665,6 @@
         const newQty = item.qty + delta;
         
         if (newQty <= 0) {
-            // If quantity becomes 0 or less, remove the item
             removeCartItem(index);
             return;
         }
@@ -636,30 +680,146 @@
     }
 
     function removeCartItem(index) {
-        if(confirm("এই আইটেমটি কার্ট থেকে সরাতে চান?")) {
-            state.cart.splice(index, 1);
-            updateCartUI();
-        }
+        state.cart.splice(index, 1);
+        updateCartUI();
     }
 
     function checkout() {
-        if(state.cart.length === 0) return;
+        if(state.cart.length === 0) {
+            showToast("কার্ট খালি!");
+            return;
+        }
         const total = state.cart.reduce((acc, c) => acc + (c.sellPrice * c.qty), 0);
+        
+        document.getElementById('checkout-total-amount').innerText = total.toLocaleString();
+        document.getElementById('checkout-paid-amount').value = total; // Pre-fill paid amount
+        document.getElementById('checkout-due-amount').innerText = '0';
+        
+        document.getElementById('checkout-customer-search').value = '';
+        document.getElementById('checkout-customer-id').value = '';
+        document.getElementById('checkout-customer-name').value = '';
+        document.getElementById('checkout-customer-phone').value = '';
+        document.getElementById('checkout-customer-address').value = '';
+        document.getElementById('customer-search-results').innerHTML = '';
+
+        toggleModal('checkout-modal');
+        handleCheckoutPayment(); // Initial calculation
+    }
+
+    function handleCustomerSearch(query) {
+        const resultsContainer = document.getElementById('customer-search-results');
+        if (!query.trim()) {
+            resultsContainer.innerHTML = '';
+            return;
+        }
+        const filteredCustomers = state.customers.filter(c => 
+            c.name.toLowerCase().includes(query.toLowerCase()) || 
+            c.phone.includes(query)
+        ).slice(0, 5);
+
+        resultsContainer.innerHTML = filteredCustomers.map(c => `
+            <div class="p-2 cursor-pointer hover:bg-gray-100" onclick="selectCustomer('${c.id}')">
+                <p class="font-bold">${c.name}</p>
+                <p class="text-xs text-gray-500">${c.phone}</p>
+            </div>
+        `).join('');
+    }
+
+    function selectCustomer(customerId) {
+        const customer = state.customers.find(c => c.id === customerId);
+        if (customer) {
+            document.getElementById('checkout-customer-id').value = customer.id;
+            document.getElementById('checkout-customer-name').value = customer.name;
+            document.getElementById('checkout-customer-phone').value = customer.phone;
+            document.getElementById('checkout-customer-address').value = customer.address || '';
+            document.getElementById('customer-search-results').innerHTML = '';
+            document.getElementById('checkout-customer-search').value = customer.name;
+        }
+    }
+
+    function handleCheckoutPayment() {
+        const total = parseFloat(document.getElementById('checkout-total-amount').innerText.replace(/,/g, ''));
+        const paid = parseFloat(document.getElementById('checkout-paid-amount').value) || 0;
+        const due = total - paid;
+        document.getElementById('checkout-due-amount').innerText = due > 0 ? due.toLocaleString() : '0';
+    }
+
+    function confirmOrder() {
+        const customerId = document.getElementById('checkout-customer-id').value;
+        let customerName = document.getElementById('checkout-customer-name').value.trim();
+        const customerPhone = document.getElementById('checkout-customer-phone').value.trim();
+        
+        if (!customerName || !customerPhone) {
+            showToast("কাস্টমারের নাম ও ফোন নম্বর আবশ্যক।");
+            return;
+        }
+
+        let finalCustomerId = customerId;
+
+        // If no existing customer was selected, create a new one
+        if (!finalCustomerId) {
+            // Check if a customer with the same phone number already exists
+            const existingCustomer = state.customers.find(c => c.phone === customerPhone);
+            if(existingCustomer) {
+                showToast("এই ফোন নম্বর দিয়ে একজন কাস্টমার bereits রেজিস্টার্ড আছেন।");
+                finalCustomerId = existingCustomer.id;
+                selectCustomer(finalCustomerId); // Populate fields with existing customer data
+                return; // Stop processing and let the user verify
+            }
+
+            finalCustomerId = 'CUST-' + Date.now();
+            const newCustomer = {
+                id: finalCustomerId,
+                name: customerName,
+                phone: customerPhone,
+                address: document.getElementById('checkout-customer-address').value.trim(),
+                email: '',
+                shopName: '',
+                totalDue: 0 // Initialize due amount for new customer
+            };
+            state.customers.push(newCustomer);
+        }
+
+        const total = state.cart.reduce((acc, c) => acc + (c.sellPrice * c.qty), 0);
+        const paidAmount = parseFloat(document.getElementById('checkout-paid-amount').value) || 0;
+        const dueAmount = total - paidAmount;
+
         const sale = {
             id: 'INV-'+Date.now(),
             date: new Date().toISOString(),
             items: [...state.cart],
-            total: total
+            total: total,
+            paidAmount: paidAmount,
+            dueAmount: dueAmount,
+            customerId: finalCustomerId
         };
+
+        // Update product stock
         state.cart.forEach(item => {
             const p = state.products.find(x => x.id === item.id);
-            p.stock -= item.qty;
+            if (p) {
+                p.stock -= item.qty;
+            }
             state.history.unshift({ date: sale.date, type: 'Sale', product: item.name, qty: item.qty });
         });
+        
+        // Update customer's total due amount
+        const customer = state.customers.find(c => c.id === finalCustomerId);
+        if (customer) {
+            customer.totalDue = (customer.totalDue || 0) + dueAmount;
+        }
+
+        // Update global due accounts (if you still need it)
+        if (dueAmount > 0) {
+            state.dueAccounts.customer += dueAmount;
+        }
+
         state.sales.push(sale);
         state.cart = [];
         saveData();
-        showToast("অর্ডার সফল!");
+
+        showToast("অর্ডার সফলভাবে সম্পন্ন হয়েছে!");
+        toggleModal('checkout-modal');
         switchTab('pos');
     }
 
@@ -754,12 +914,16 @@
 
     // --- Financials ---
     function renderAccounts(container) {
+        const totalCustomerDue = state.customers.reduce((sum, customer) => sum + (customer.totalDue || 0), 0);
+
         container.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="bg-white p-8 rounded-3xl border shadow-lg text-center">
-                    <p class="text-red-500 font-bold mb-2">কাস্টমার বাকি</p>
-                    <h1 class="text-5xl font-black mb-6">৳${state.dueAccounts.customer.toLocaleString()}</h1>
-                    <div class="flex gap-2"><input type="number" id="pay-c" placeholder="টাকা" class="flex-1 p-3 border rounded-xl outline-none"><button onclick="updateDue('customer', -1)" class="bg-red-500 text-white px-6 rounded-xl">আদায়</button></div>
+                    <p class="text-red-500 font-bold mb-2">মোট কাস্টমার বাকি</p>
+                    <h1 class="text-5xl font-black mb-6">৳${totalCustomerDue.toLocaleString()}</h1>
+                    <div class="bg-gray-100 p-3 rounded-xl text-sm text-gray-600">
+                        বাকি আদায় করতে, 'কাস্টমার' ট্যাব থেকে নির্দিষ্ট কাস্টমারের পেমেন্ট রেকর্ড করুন।
+                    </div>
                 </div>
                 <div class="bg-white p-8 rounded-3xl border shadow-lg text-center">
                     <p class="text-blue-600 font-bold mb-2">সাপ্লায়ার দেনা</p>
@@ -771,7 +935,12 @@
     }
 
     function updateDue(type, mult) {
-        const val = parseFloat(document.getElementById(type === 'customer' ? 'pay-c' : 'pay-s').value || 0);
+        // This function is now only for supplier payments from the accounts tab.
+        if (type === 'customer') {
+            showToast("অনুগ্রহ করে 'কাস্টমার' ট্যাব থেকে পেমেন্ট করুন।", "error");
+            return;
+        }
+        const val = parseFloat(document.getElementById('pay-s').value || 0);
         state.dueAccounts[type] += (val * mult);
         saveData();
         switchTab('accounts');
@@ -799,8 +968,10 @@
                         <p class="text-sm text-gray-500">📧 ${c.email || 'নেই'}</p>
                         <p class="text-sm text-gray-500">🏠 ${c.address || 'নেই'}</p>
                         <p class="text-sm text-gray-500">🏢 ${c.shopName || 'নেই'}</p>
+                        <p class="font-bold text-red-500 mt-2">বাকি: ৳${(c.totalDue || 0).toLocaleString()}</p>
                         <div class="mt-4 pt-4 border-t flex justify-between items-center">
                             <div class="space-x-2">
+                                <button onclick="openCustomerPaymentModal(${idx})" class="text-blue-500 text-xs font-bold">পেমেন্ট</button>
                                 <button onclick="openEditCustomerModal(${idx})" class="text-green-500 text-xs font-bold">ইডিট</button>
                                 <button onclick="deleteCustomer(${idx})" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
                             </div>
@@ -810,6 +981,29 @@
                         </div>
                     </div>
                 `).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন কাস্টমার পাওয়া যায়নি।</div>'}
+            </div>
+
+            <!-- Customer Payment Modal -->
+            <div id="customer-payment-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+                    <h3 class="text-xl font-bold mb-2">বাকি টাকা আদায়</h3>
+                    <p class="mb-4 text-gray-600">কাস্টমার: <span id="payment-customer-name" class="font-bold"></span></p>
+                    
+                    <div class="mb-4 bg-gray-100 p-3 rounded-lg text-center">
+                        <p class="text-sm">বর্তমান বাকি</p>
+                        <p class="text-2xl font-bold text-red-600">৳<span id="payment-customer-due">0</span></p>
+                    </div>
+
+                    <input type="hidden" id="payment-customer-index">
+                    <div class="space-y-2">
+                        <label for="payment-amount" class="block text-sm font-medium text-gray-700">কত টাকা আদায় হয়েছে?</label>
+                        <input type="number" id="payment-amount" min="1" class="w-full p-3 border rounded-xl outline-none" required>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" onclick="toggleModal('customer-payment-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                        <button type="button" onclick="recordCustomerPayment()" class="bg-blue-600 text-white px-6 py-2 rounded-xl">পেমেন্ট রেকর্ড করুন</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Add Customer Modal -->
@@ -917,6 +1111,49 @@
             switchTab('customers');
             showToast("কাস্টমার ডিলিট হয়েছে!");
         }
+    }
+
+    function openCustomerPaymentModal(index) {
+        const customer = state.customers[index];
+        if (!customer) return;
+
+        document.getElementById('payment-customer-index').value = index;
+        document.getElementById('payment-customer-name').innerText = customer.name;
+        document.getElementById('payment-customer-due').innerText = (customer.totalDue || 0).toLocaleString();
+        document.getElementById('payment-amount').value = '';
+
+        toggleModal('customer-payment-modal');
+    }
+
+    function recordCustomerPayment() {
+        const index = document.getElementById('payment-customer-index').value;
+        const amount = parseFloat(document.getElementById('payment-amount').value);
+
+        if (index === '' || isNaN(amount) || amount <= 0) {
+            showToast("সঠিক পরিমাণ লিখুন।");
+            return;
+        }
+
+        const customer = state.customers[index];
+        if (!customer) return;
+
+        customer.totalDue -= amount;
+        
+        state.history.unshift({ 
+            date: new Date().toISOString(), 
+            type: 'Due Collection', 
+            product: `Payment from ${customer.name}`, 
+            qty: amount 
+        });
+
+        // Also update the global due account for consistency if needed, though it's now calculated
+        state.dueAccounts.customer -= amount;
+        if (state.dueAccounts.customer < 0) state.dueAccounts.customer = 0;
+
+        saveData();
+        toggleModal('customer-payment-modal');
+        switchTab('customers');
+        showToast(`৳${amount} পেমেন্ট রেকর্ড হয়েছে।`);
     }
 
     // --- Utilities ---
