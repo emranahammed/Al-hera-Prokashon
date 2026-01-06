@@ -238,12 +238,31 @@
     }
 
     // --- Order History Logic ---
+    let orderHistorySearchTerm = ''; // New state variable for search term
+
     function renderOrderHistory(container) {
+        let filteredSales = state.sales.slice().reverse();
+
+        if (orderHistorySearchTerm) {
+            const searchTermLower = orderHistorySearchTerm.toLowerCase();
+            filteredSales = filteredSales.filter(sale => {
+                const customer = state.customers.find(c => c.id === sale.customerId) || { name: '' };
+                const customerNameLower = customer.name.toLowerCase();
+                const invoiceIdLower = sale.id.toLowerCase();
+
+                return invoiceIdLower.includes(searchTermLower) || customerNameLower.includes(searchTermLower);
+            });
+        }
+
         container.innerHTML = `
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">অর্ডার হিস্টোরি</h2>
             </div>
             
+            <div class="mb-4">
+                <input type="text" id="order-history-search" oninput="handleOrderHistorySearch(this.value)" placeholder="ইনভয়েস ID অথবা কাস্টমারের নাম দিয়ে খুঁজুন..." class="w-full p-3 border rounded-xl outline-none" value="${orderHistorySearchTerm}">
+            </div>
+
             <div class="bg-white rounded-2xl shadow-sm border overflow-hidden overflow-x-auto">
                 <table class="w-full text-left text-sm min-w-[900px]">
                     <thead class="bg-gray-50 border-b">
@@ -258,7 +277,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y">
-                        ${state.sales.slice().reverse().map(sale => {
+                        ${filteredSales.map(sale => {
                             const customer = state.customers.find(c => c.id === sale.customerId) || { name: 'N/A' };
                             return `
                             <tr class="hover:bg-gray-50">
@@ -292,6 +311,11 @@
             </div>
         `;
         if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function handleOrderHistorySearch(term) {
+        orderHistorySearchTerm = term;
+        renderOrderHistory(document.getElementById('content-area'));
     }
 
     function openInvoiceModal(saleId) {
