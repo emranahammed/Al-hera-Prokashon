@@ -1869,7 +1869,768 @@
             };
         }
 
-        // ... rest of existing code (renderDashboard, renderIncome, etc.) ...
+        // Render Dashboard Page
+        function renderDashboard() {
+            document.getElementById('page-content').innerHTML = `
+                <h3 class="text-xl font-black text-slate-800 tracking-tight">Dashboard Overview</h3>
+                <p class="text-slate-500 text-sm mt-1">Welcome to your admin panel.</p>
+                <!-- Dashboard content will go here -->
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Income</h4>
+                        <p class="text-4xl font-black text-green-600">৳ ${allIncomes.reduce((sum, inc) => sum + inc.amount, 0).toLocaleString()}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Expenses</h4>
+                        <p class="text-4xl font-black text-red-600">৳ ${allOrders.reduce((sum, order) => sum + order.totalAmount, 0).toLocaleString()}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Income Records Page
+        function renderIncome() {
+            const incomeList = allIncomes.sort((a,b) => (b.createdAt?.toDate() || new Date()) - (a.createdAt?.toDate() || new Date()));
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Income Overview</h4>
+                                <p class="text-sm text-slate-600">Manage all income records.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Income Records: ${allIncomes.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    ${incomeList.map(income => `
+                        <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-4 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+                                    <i data-lucide="trending-up" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate">${income.source}</p>
+                                    <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                                        <span>${income.type}</span>
+                                        <span>•</span>
+                                        <span>${new Date(income.date).toLocaleDateString()}</span>
+                                        <span>•</span>
+                                        <span>${income.userName}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="text-right">
+                                    <p class="text-sm font-black text-green-600">
+                                        ৳ ${income.amount.toLocaleString()}
+                                    </p>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="window.openIncomeModal('${income.id}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="window.confirmDeleteIncome('${income.id}', '${income.source}')" class="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-xl">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO INCOME RECORDS FOUND</p>'}
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Render Income Summary Page
+        function renderIncomeSummary() {
+            // Group incomes by type
+            const incomeSummaryByType = allIncomeTypes.map(type => {
+                const total = allIncomes
+                    .filter(income => income.type === type.name)
+                    .reduce((sum, income) => sum + income.amount, 0);
+                return { type: type.name, total: total };
+            });
+
+            // Group incomes by month
+            const incomeSummaryByMonth = {};
+            allIncomes.forEach(income => {
+                const date = new Date(income.date);
+                const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
+                if (!incomeSummaryByMonth[monthYear]) {
+                    incomeSummaryByMonth[monthYear] = 0;
+                }
+                incomeSummaryByMonth[monthYear] += income.amount;
+            });
+
+            const totalOverallIncome = allIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Income Summary</h4>
+                                <p class="text-sm text-slate-600">Overview of all income by type and period.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Overall Total Income: ৳ ${totalOverallIncome.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Income by Type</h4>
+                        <div class="space-y-3">
+                            ${incomeSummaryByType.map(item => `
+                                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+                                    <span class="font-bold text-slate-700">${item.type}</span>
+                                    <span class="font-black text-green-600">৳ ${item.total.toLocaleString()}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Income by Month</h4>
+                        <div class="space-y-3">
+                            ${Object.keys(incomeSummaryByMonth).sort((a, b) => new Date(a) - new Date(b)).map(monthYear => `
+                                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+                                    <span class="font-bold text-slate-700">${monthYear}</span>
+                                    <span class="font-black text-green-600">৳ ${incomeSummaryByMonth[monthYear].toLocaleString()}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Render Income Types Page
+        function renderIncomeTypes() {
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Income Types Management</h4>
+                                <p class="text-sm text-slate-600">Define and manage different categories of income.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Types: ${allIncomeTypes.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    ${allIncomeTypes.map(type => `
+                        <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-4 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                    <i data-lucide="tag" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate">${type.name}</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-1">
+                                <button onclick="window.openAddIncomeTypeModal('${type.id}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="window.confirmDeleteIncomeType('${type.id}', '${type.name}')" class="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-xl">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO INCOME TYPES FOUND</p>'}
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Render Expenses History Page (entries)
+        function renderEntries() {
+            // This is a placeholder for the Expenses History page
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Expense History</h4>
+                                <p class="text-sm text-slate-600">All your recorded expenses will appear here.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Expenses: ${allOrders.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    ${allOrders.map(order => `
+                        <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-4 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                                    <i data-lucide="trending-down" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate">${order.entryName || 'No Name'}</p>
+                                    <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                                        <span>Invoice ID: ${order.id}</span>
+                                        <span>•</span>
+                                        <span>Customer: ${order.userName || 'N/A'}</span>
+                                        <span>•</span>
+                                        <span>Date: ${new Date(order.purchaseDate).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-red-600">
+                                    ৳ ${order.totalAmount.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO EXPENSE RECORDS FOUND</p>'}
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Render All Transactions Page (Order History)
+        function renderTransactions() {
+            let filteredTransactions = allOrders; // Assuming allOrders contains transaction data
+
+            if (transactionFilter.startDate) {
+                filteredTransactions = filteredTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.purchaseDate);
+                    return transactionDate >= new Date(transactionFilter.startDate);
+                });
+            }
+            
+            if (transactionFilter.endDate) {
+                filteredTransactions = filteredTransactions.filter(transaction => {
+                    const transactionDate = new Date(transaction.purchaseDate);
+                    const endDate = new Date(transactionFilter.endDate);
+                    endDate.setHours(23, 59, 59, 999);
+                    return transactionDate <= endDate;
+                });
+            }
+
+            if (transactionFilter.type !== 'all') {
+                // Assuming a 'type' field exists in transaction data
+                // This would need to be adapted based on actual data structure
+                // For now, only 'expense' is assumed based on the name 'allOrders'
+                // If there are other types (income, principal), this filter needs expansion
+                filteredTransactions = filteredTransactions.filter(transaction => {
+                    return transactionFilter.type === 'expense'; // Only show expenses for now
+                });
+            }
+
+            if (transactionFilter.user !== 'all') {
+                filteredTransactions = filteredTransactions.filter(transaction => transaction.userId === transactionFilter.user);
+            }
+
+            if (transactionFilter.searchText) {
+                const searchTerm = transactionFilter.searchText.toLowerCase();
+                filteredTransactions = filteredTransactions.filter(transaction => {
+                    const invoiceId = transaction.id ? transaction.id.toLowerCase() : '';
+                    const customerName = transaction.userName ? transaction.userName.toLowerCase() : '';
+                    const entryName = transaction.entryName ? transaction.entryName.toLowerCase() : ''; // Also search in entryName
+
+                    return invoiceId.includes(searchTerm) || 
+                           customerName.includes(searchTerm) ||
+                           entryName.includes(searchTerm);
+                });
+            }
+            
+            // Get unique users for filter dropdown
+            const uniqueUsers = [...new Set(allOrders.map(order => order.userId))]
+                .map(userId => {
+                    const user = allUsers.find(u => u.uid === userId) || allOrders.find(order => order.userId === userId);
+                    return { id: userId, name: user ? user.userName : 'Unknown User' };
+                })
+                .filter((user, index, self) => 
+                    index === self.findIndex((u) => u.id === user.id)
+                );
+
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">All Transactions (Order History)</h4>
+                                <p class="text-sm text-slate-600">Overview of all income and expense transactions.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Transactions: ${allOrders.length} | Filtered: ${filteredTransactions.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transaction Filter Panel -->
+                <div id="transaction-filter-panel" class="filter-panel collapsed bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <!-- Search Text -->
+                        <div class="space-y-2 lg:col-span-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Search (Invoice ID, Customer)</label>
+                            <input type="text" id="transaction-search-text" value="${transactionFilter.searchText}" placeholder="Search by Invoice ID or Customer Name" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                        </div>
+
+                        <!-- Transaction Type -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Type</label>
+                            <select id="transaction-type-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all" ${transactionFilter.type === 'all' ? 'selected' : ''}>All Types</option>
+                                <option value="expense" ${transactionFilter.type === 'expense' ? 'selected' : ''}>Expense</option>
+                                <!-- Add other types like income, principal if applicable -->
+                            </select>
+                        </div>
+                        
+                        <!-- User Filter -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">User</label>
+                            <select id="transaction-user-filter" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                                <option value="all" ${transactionFilter.user === 'all' ? 'selected' : ''}>All Users</option>
+                                ${uniqueUsers.map(user => `
+                                    <option value="${user.id}" ${transactionFilter.user === user.id ? 'selected' : ''}>${user.name}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <!-- Date Range -->
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Start Date</label>
+                            <input type="date" id="transaction-start-date" value="${transactionFilter.startDate}" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest">End Date</label>
+                            <input type="date" id="transaction-end-date" value="${transactionFilter.endDate}" class="w-full bg-slate-50 p-3 rounded-xl text-sm font-bold border-none outline-none ring-1 ring-slate-100">
+                        </div>
+                    </div>
+                    
+                    <!-- Filter Actions -->
+                    <div class="flex gap-3">
+                        <button onclick="window.applyTransactionFilter()" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            APPLY FILTERS
+                        </button>
+                        <button onclick="window.resetTransactionFilter()" class="flex-1 bg-slate-100 text-slate-800 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest">
+                            RESET FILTERS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Transactions List -->
+                <div class="space-y-3">
+                    ${filteredTransactions.map(transaction => `
+                        <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-4 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-slate-50 text-slate-600 flex items-center justify-center shrink-0">
+                                    <i data-lucide="activity" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate">${transaction.entryName || 'Transaction'}</p>
+                                    <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                                        <span>Invoice ID: ${transaction.id}</span>
+                                        <span>•</span>
+                                        <span>Customer: ${transaction.userName || 'N/A'}</span>
+                                        <span>•</span>
+                                        <span>Date: ${new Date(transaction.purchaseDate).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black ${transaction.totalAmount > 0 ? 'text-red-600' : 'text-green-600'}">
+                                    ৳ ${transaction.totalAmount.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO TRANSACTIONS FOUND</p>'}
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        window.toggleTransactionFilter = () => {
+            const filterPanel = document.getElementById('transaction-filter-panel');
+            if (!filterPanel) {
+                // If the panel doesn't exist yet, render transactions first
+                renderTransactions();
+                // Then try to get the panel again and toggle it
+                const newFilterPanel = document.getElementById('transaction-filter-panel');
+                if (newFilterPanel) {
+                    newFilterPanel.classList.toggle('collapsed');
+                    newFilterPanel.classList.toggle('expanded');
+                }
+            } else {
+                filterPanel.classList.toggle('collapsed');
+                filterPanel.classList.toggle('expanded');
+            }
+        };
+
+        window.applyTransactionFilter = () => {
+            transactionFilter.searchText = document.getElementById('transaction-search-text').value;
+            transactionFilter.type = document.getElementById('transaction-type-filter').value;
+            transactionFilter.user = document.getElementById('transaction-user-filter').value;
+            transactionFilter.startDate = document.getElementById('transaction-start-date').value;
+            transactionFilter.endDate = document.getElementById('transaction-end-date').value;
+            
+            renderTransactions();
+        };
+
+        window.resetTransactionFilter = () => {
+            transactionFilter = {
+                startDate: '',
+                endDate: '',
+                type: 'all',
+                user: 'all',
+                searchText: ''
+            };
+            
+            if (document.getElementById('transaction-search-text')) {
+                document.getElementById('transaction-search-text').value = '';
+                document.getElementById('transaction-type-filter').value = 'all';
+                document.getElementById('transaction-user-filter').value = 'all';
+                document.getElementById('transaction-start-date').value = '';
+                document.getElementById('transaction-end-date').value = '';
+            }
+            
+            renderTransactions();
+        };
+
+
+        // Render Principal Transactions Page
+        function renderPrincipalTransactions() {
+            const transactionList = allPrincipalTransactions.sort((a,b) => (b.createdAt?.toDate() || new Date()) - (a.createdAt?.toDate() || new Date()));
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Principal Transactions Overview</h4>
+                                <p class="text-sm text-slate-600">Manage all principal deposits and withdrawals.</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-black text-slate-800">
+                                    Total Transactions: ${allPrincipalTransactions.length}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    ${transactionList.map(transaction => `
+                        <div class="bg-white p-5 rounded-[2.2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div class="flex items-center gap-4 flex-1">
+                                <div class="w-12 h-12 rounded-2xl ${transaction.type === 'deposit' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'} flex items-center justify-center shrink-0">
+                                    <i data-lucide="${transaction.type === 'deposit' ? 'arrow-down-circle' : 'arrow-up-circle'}" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-black text-slate-800 truncate">${transaction.purpose}</p>
+                                    <div class="flex items-center gap-2 text-[9px] font-bold text-slate-400 mt-1">
+                                        <span>${transaction.type.toUpperCase()}</span>
+                                        <span>•</span>
+                                        <span>${new Date(transaction.date).toLocaleDateString()}</span>
+                                        <span>•</span>
+                                        <span>${transaction.userName}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <div class="text-right">
+                                    <p class="text-sm font-black ${transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'}">
+                                        ৳ ${transaction.amount.toLocaleString()}
+                                    </p>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="window.openPrincipalTransactionModal('${transaction.id}')" class="p-2 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-xl">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="window.confirmDeletePrincipalTransaction('${transaction.id}', '${transaction.purpose}')" class="p-2 bg-slate-50 text-slate-400 hover:text-red-600 rounded-xl">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') || '<p class="py-20 text-center font-bold text-slate-300">NO PRINCIPAL TRANSACTIONS FOUND</p>'}
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Render Summary Page
+        function renderSummary() {
+            // Get today's date in YYYY-MM-DD format
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            currentSummaryDate = `${year}-${month}-${day}`;
+
+            const filteredIncomes = allIncomes.filter(inc => inc.date === currentSummaryDate);
+            const filteredExpenses = allOrders.filter(order => order.purchaseDate === currentSummaryDate); // Assuming purchaseDate is the relevant field for orders
+
+            const totalDailyIncome = filteredIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+            const totalDailyExpense = filteredExpenses.reduce((sum, exp) => sum + exp.totalAmount, 0);
+            const dailyBalance = totalDailyIncome - totalDailyExpense;
+
+            document.getElementById('page-content').innerHTML = `
+                <div class="mb-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Daily Summary: ${new Date(currentSummaryDate).toLocaleDateString()}</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Income</p>
+                                <p class="text-2xl font-black text-green-600">৳ ${totalDailyIncome.toLocaleString()}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Expense</p>
+                                <p class="text-2xl font-black text-red-600">৳ ${totalDailyExpense.toLocaleString()}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Balance</p>
+                                <p class="text-2xl font-black ${dailyBalance >= 0 ? 'text-blue-600' : 'text-red-600'}">৳ ${dailyBalance.toLocaleString()}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Daily Income</h4>
+                        <div class="space-y-3">
+                            ${filteredIncomes.map(income => `
+                                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+                                    <span class="font-bold text-slate-700">${income.source} (${income.type})</span>
+                                    <span class="font-black text-green-600">৳ ${income.amount.toLocaleString()}</span>
+                                </div>
+                            `).join('') || '<p class="text-center text-slate-400">No income today</p>'}
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Daily Expenses</h4>
+                        <div class="space-y-3">
+                            ${filteredExpenses.map(expense => `
+                                <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
+                                    <span class="font-bold text-slate-700">${expense.entryName || 'Expense'}</span>
+                                    <span class="font-black text-red-600">৳ ${expense.totalAmount.toLocaleString()}</span>
+                                </div>
+                            `).join('') || '<p class="text-center text-slate-400">No expenses today</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            refreshIcons();
+            setupScrollToTop();
+        }
+
+        // Universal Modal Functions
+        window.openModalUI = () => {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('modal-content').classList.remove('translate-y-full');
+            }, 50); // Small delay for animation
+        };
+
+        window.closeModal = () => {
+            document.getElementById('modal-content').classList.add('translate-y-full');
+            setTimeout(() => {
+                document.getElementById('modal-overlay').classList.add('hidden');
+                document.getElementById('modal-body').innerHTML = ''; // Clear content
+            }, 300); // Match CSS transition duration
+        };
+
+        // Delete Modal Functions
+        window.showDeleteModal = () => {
+            document.getElementById('delete-modal').classList.remove('hidden');
+        };
+
+        window.hideDeleteModal = () => {
+            document.getElementById('delete-modal').classList.add('hidden');
+            entryToDelete = null;
+        };
+
+        // Restore Modal Functions
+        window.showRestoreModal = () => {
+            document.getElementById('restore-modal').classList.remove('hidden');
+        };
+
+        // Logout Modal Functions
+        window.showLogoutConfirm = () => {
+            document.getElementById('logout-modal').classList.remove('hidden');
+        };
+
+        window.hideLogoutModal = () => {
+            document.getElementById('logout-modal').classList.add('hidden');
+        };
+
+        window.logout = async () => {
+            try {
+                await signOut(auth);
+                window.showToast("Logged out successfully");
+                window.hideLogoutModal();
+            } catch (error) {
+                console.error("Error logging out:", error);
+                window.showToast("Error logging out");
+            }
+        };
+
+        // Toast Functions
+        window.showToast = (msg) => {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            toastMsg.textContent = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        };
+
+        // Start Data Sync - Add audit logs and deleted entries sync
+        function startDataSync() {
+            // Sync all users
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (s) => {
+                allUsers = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Trigger re-render if user-dependent pages are active
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(['audit-log', 'transactions', 'principal-transactions', 'income'].includes(page)) {
+                        window.navigateTo(page);
+                    }
+                }
+            });
+
+            // Sync all income types
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'incomeTypes'), (s) => {
+                allIncomeTypes = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(['income-types', 'income'].includes(page)) {
+                        window.navigateTo(page);
+                    }
+                }
+            });
+
+            // Sync all incomes
+            onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'incomes'), orderBy('createdAt', 'desc')), (s) => {
+                allIncomes = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(['income', 'income-summary', 'dashboard', 'summary'].includes(page)) {
+                        window.navigateTo(page);
+                    }
+                }
+            });
+
+            // Sync all orders (expenses)
+            onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderBy('purchaseDate', 'desc')), (s) => {
+                allOrders = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(['entries', 'transactions', 'dashboard', 'summary'].includes(page)) {
+                        window.navigateTo(page);
+                    }
+                }
+            });
+
+            // Sync all principal transactions
+            onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'principalTransactions'), orderBy('createdAt', 'desc')), (s) => {
+                allPrincipalTransactions = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(['principal-transactions', 'dashboard'].includes(page)) {
+                        window.navigateTo(page);
+                    }
+                }
+            });
+            
+            // Sync audit logs
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'auditLogs'), (s) => {
+                allAuditLogs = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
+                    const timeA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+                    const timeB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+                    return timeB - timeA;
+                });
+                
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(page === 'audit-log') renderAuditLog();
+                }
+            });
+            
+            // Sync deleted entries
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'deletedEntries'), (s) => {
+                allDeletedEntries = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
+                    const timeA = a.deletedAt?.toDate ? a.deletedAt.toDate() : new Date(a.deletedAt);
+                    const timeB = b.deletedAt?.toDate ? b.deletedAt.toDate() : new Date(b.deletedAt);
+                    return timeB - timeA;
+                });
+                
+                const active = document.querySelector('.sidebar-link.active, .nav-bottom-item.active');
+                if(active) {
+                    const page = active.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if(page === 'deleted-entries') renderDeletedEntries();
+                }
+            });
+            
+        }
+
+        // Scroll to top button setup
+        function setupScrollToTop() {
+            const scrollToTopBtn = document.getElementById('scrollToTopBtn');
+            
+            // Show/hide button based on scroll position
+            window.addEventListener('scroll', () => {
+                if (window.pageYOffset > 300) {
+                    scrollToTopBtn.classList.remove('hidden');
+                } else {
+                    scrollToTopBtn.classList.add('hidden');
+                }
+            });
+            
+            // Scroll to top function
+            scrollToTopBtn.onclick = () => {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            };
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            setupScrollToTop();
+            refreshIcons();
+        });
 
         // Initialize the app
         document.addEventListener('DOMContentLoaded', function() {

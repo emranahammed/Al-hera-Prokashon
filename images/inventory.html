@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>স্মার্ট ইনভেন্টরি ও অ্যাকাউন্টস - প্রো ভার্সন</title>
+    <title>Al Hera Publication</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
     <!-- Firebase Libraries -->
@@ -34,7 +34,7 @@
         window.db = db;
         window.appId = appId;
         
-        signInAnonymously(auth).catch(console.error);
+        signInAnonymously(auth).catch(() => {});
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 window.userId = user.uid;
@@ -48,6 +48,7 @@
         body {
             font-family: 'Hind Siliguri', sans-serif;
             background-color: #f3f4f6;
+            overflow-x: hidden;
         }
         .sidebar-active {
             background-color: #3b82f6;
@@ -62,12 +63,25 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 
+<header class="flex justify-between items-center p-4 bg-white border-b no-print">
+    <h1 class="text-xl font-bold text-blue-600">Al Hera Publication</h1>
+    <button id="menu-toggle-button" class="p-2 md:hidden" style="color: black; z-index: 51;">
+        <span class="menu-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </span>
+        <span class="close-icon hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </span>
+    </button>
+</header>
+
+<div id="backdrop" class="fixed inset-0 bg-black/50 z-10 hidden"></div>
 <div class="flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r hidden md:flex flex-col no-print">
+    <aside id="sidebar" class="w-64 bg-white border-r flex-col no-print fixed inset-y-0 left-0 z-50 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out md:flex">
         <div class="p-6">
             <h1 class="text-2xl font-bold text-blue-600 flex items-center gap-2">
-                <i data-lucide="shield-check"></i> স্মার্ট শপ প্রো
+                <i data-lucide="shield-check"></i> Al Hera Publication
             </h1>
         </div>
         <nav class="flex-1 px-4 space-y-1">
@@ -114,6 +128,34 @@
 </div>
 
 <script>
+    const menuToggleButton = document.getElementById('menu-toggle-button');
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('backdrop');
+
+    function toggleSidebar() {
+        sidebar.classList.toggle('-translate-x-full');
+        backdrop.classList.toggle('hidden');
+        
+        const menuIcon = menuToggleButton.querySelector('.menu-icon');
+        const closeIcon = menuToggleButton.querySelector('.close-icon');
+
+        menuIcon.classList.toggle('hidden');
+        closeIcon.classList.toggle('hidden');
+    }
+
+    menuToggleButton.addEventListener('click', toggleSidebar);
+    backdrop.addEventListener('click', toggleSidebar);
+
+    sidebar.addEventListener('click', (e) => {
+        if (e.target.closest('.nav-btn')) {
+            setTimeout(() => {
+                if (!sidebar.classList.contains('-translate-x-full')) {
+                    toggleSidebar();
+                }
+            }, 150);
+        }
+    });
+
     // --- State Management ---
     let state = {
         products: JSON.parse(localStorage.getItem('ss_products')) || [],
@@ -138,7 +180,7 @@
                 updateSyncStatus("Cloud Synced ✅", "bg-green-100 text-green-600");
                 switchTab(currentTab);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { }
     }
 
     async function syncToCloud() {
@@ -173,7 +215,7 @@
 
     // --- Tab Switching ---
     let currentTab = 'dashboard';
-    function switchTab(tab) {
+    function switchTab(tab, callback) {
         currentTab = tab;
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('sidebar-active'));
         document.getElementById(`btn-${tab}`)?.classList.add('sidebar-active');
@@ -188,7 +230,11 @@
         else if (tab === 'accounts') renderAccounts(area);
         else if (tab === 'customers') renderCustomers(area);
 
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        
+
+        if (callback && typeof callback === 'function') {
+            callback();
+        }
     }
 
     // --- Order History Logic ---
@@ -373,6 +419,7 @@
                 </div>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function addVendor(e) {
@@ -760,6 +807,7 @@
         });
         renderPOSGrid(state.products);
         updateCartUI();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function renderPOSGrid(list) {
@@ -965,52 +1013,190 @@
     }
 
     // --- Reports Logic ---
-    function renderReports(container) {
-        const today = new Date().toISOString().split('T')[0];
-        const thisMonth = today.substring(0, 7);
+    let filteredSales = [];
 
-        const dailySales = state.sales.filter(s => s.date.startsWith(today));
-        const dailyTotal = dailySales.reduce((acc, s) => acc + s.total, 0);
+    function renderReports(container, salesData = null) {
+        const salesToDisplay = salesData || state.sales.slice().reverse();
+        filteredSales = salesToDisplay; // Store for export
 
-        const monthlySales = state.sales.filter(s => s.date.startsWith(thisMonth));
-        const monthlyTotal = monthlySales.reduce((acc, s) => acc + s.total, 0);
+        const totalRevenue = salesToDisplay.reduce((acc, s) => acc + s.total, 0);
+        const totalPaid = salesToDisplay.reduce((acc, s) => acc + (s.paidAmount || 0), 0);
+        const totalDue = salesToDisplay.reduce((acc, s) => acc + (s.dueAmount || 0), 0);
+        
+        // Get date range for print header
+        const startDateValue = document.getElementById('start-date')?.value;
+        const endDateValue = document.getElementById('end-date')?.value;
+        const dateRangeStr = (startDateValue && endDateValue)
+            ? `From ${startDateValue} to ${endDateValue}`
+            : 'All Time';
 
         container.innerHTML = `
-            <h2 class="text-2xl font-bold mb-6">সেলস রিপোর্ট</h2>
+            <div class="no-print">
+                <h2 class="text-2xl font-bold mb-6">সেলস রিপোর্ট</h2>
+            </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-3xl text-white">
-                    <p class="opacity-80 font-bold">আজকের বিক্রি (${today})</p>
-                    <h3 class="text-4xl font-black mt-2">৳${dailyTotal.toLocaleString()}</h3>
-                    <p class="text-xs mt-2">মোট ইনভয়েস: ${dailySales.length} টি</p>
-                </div>
-                <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-3xl text-white">
-                    <p class="opacity-80 font-bold">এই মাসের বিক্রি (${new Date().toLocaleString('default', { month: 'long' })})</p>
-                    <h3 class="text-4xl font-black mt-2">৳${monthlyTotal.toLocaleString()}</h3>
-                    <p class="text-xs mt-2">মোট ইনভয়েস: ${monthlySales.length} টি</p>
+            <div class="bg-white rounded-2xl border shadow-sm p-6 mb-6 no-print">
+                <h4 class="font-bold mb-4">রিপোর্ট ফিল্টার</h4>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label for="start-date" class="text-sm font-medium">শুরুর তারিখ</label>
+                        <input type="date" id="start-date" class="w-full p-2 border rounded-lg mt-1" value="${startDateValue || ''}">
+                    </div>
+                    <div>
+                        <label for="end-date" class="text-sm font-medium">শেষ তারিখ</label>
+                        <input type="date" id="end-date" class="w-full p-2 border rounded-lg mt-1" value="${endDateValue || ''}">
+                    </div>
+                    <div class="md:col-span-2 flex gap-2">
+                        <button onclick="filterSalesReport()" class="w-full bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
+                            <i data-lucide="filter"></i> ফিল্টার
+                        </button>
+                        <button onclick="printReport()" class="w-full bg-gray-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
+                            <i data-lucide="printer"></i> প্রিন্ট
+                        </button>
+                        <button onclick="exportReportToCSV()" class="w-full bg-green-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
+                            <i data-lucide="download"></i> CSV
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-2xl border shadow-sm p-6">
-                <h4 class="font-bold mb-4">সাম্প্রতিক বিক্রয় তালিকা</h4>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 border-b">
-                            <tr><th class="p-3 text-left">ইনভয়েস</th><th class="p-3 text-left">তারিখ</th><th class="p-3 text-right">টাকা</th></tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            ${state.sales.slice().reverse().map(s => `
+            <div id="report-content">
+                <!-- Print Only Header -->
+                <div class="hidden print:block mb-8">
+                    <h1 class="text-2xl font-bold text-center">Al Hera Publication</h1>
+                    <p class="text-center text-sm">Sales Report (${dateRangeStr})</p>
+                    <div class="mt-4 pt-4 border-t flex justify-around text-lg">
+                        <div><span class="font-bold">Total Sales:</span> ৳${totalRevenue.toLocaleString()}</div>
+                        <div><span class="font-bold">Total Paid:</span> ৳${totalPaid.toLocaleString()}</div>
+                        <div><span class="font-bold">Total Due:</span> ৳${totalDue.toLocaleString()}</div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 no-print">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-3xl text-white">
+                        <p class="opacity-80 font-bold">মোট বিক্রি</p>
+                        <h3 class="text-4xl font-black mt-2">৳${totalRevenue.toLocaleString()}</h3>
+                        <p class="text-xs mt-2">মোট ইনভয়েস: ${salesToDisplay.length} টি</p>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-3xl text-white">
+                        <p class="opacity-80 font-bold">মোট আদায়</p>
+                        <h3 class="text-4xl font-black mt-2">৳${totalPaid.toLocaleString()}</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-red-500 to-red-600 p-6 rounded-3xl text-white">
+                        <p class="opacity-80 font-bold">মোট বাকি</p>
+                        <h3 class="text-4xl font-black mt-2">৳${totalDue.toLocaleString()}</h3>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border shadow-sm p-6">
+                    <h4 class="font-bold mb-4">বিক্রয় তালিকা</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b">
                                 <tr>
-                                    <td class="p-3 font-mono text-xs">${s.id}</td>
-                                    <td class="p-3 text-gray-500">${new Date(s.date).toLocaleString()}</td>
-                                    <td class="p-3 text-right font-bold">৳${s.total}</td>
+                                    <th class="p-3 text-left">ইনভয়েস</th>
+                                    <th class="p-3 text-left">তারিখ</th>
+                                    <th class="p-3 text-left">কাস্টমার</th>
+                                    <th class="p-3 text-right">মোট</th>
+                                    <th class="p-3 text-right">পরিশোধিত</th>
+                                    <th class="p-3 text-right">বাকি</th>
                                 </tr>
-                            `).join('') || '<tr><td colspan="3" class="p-10 text-center text-gray-300">কোন সেলস ডাটা নেই</td></tr>'}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody class="divide-y">
+                                ${salesToDisplay.map(s => {
+                                    const customer = state.customers.find(c => c.id === s.customerId) || { name: 'N/A' };
+                                    return `
+                                    <tr>
+                                        <td class="p-3 font-mono text-xs">${s.id}</td>
+                                        <td class="p-3 text-gray-500">${new Date(s.date).toLocaleString('bn-BD')}</td>
+                                        <td class="p-3 text-gray-600">${customer.name}</td>
+                                        <td class="p-3 text-right font-bold">৳${s.total.toLocaleString()}</td>
+                                        <td class="p-3 text-right text-green-600">৳${(s.paidAmount || 0).toLocaleString()}</td>
+                                        <td class="p-3 text-right text-red-600">৳${(s.dueAmount || 0).toLocaleString()}</td>
+                                    </tr>
+                                    `
+                                }).join('') || '<tr><td colspan="6" class="p-10 text-center text-gray-300">কোন সেলস ডাটা নেই</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function filterSalesReport() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        
+        if (!startDate || !endDate) {
+            showToast("অনুগ্রহ করে শুরুর এবং শেষের তারিখ দিন।");
+            return;
+        }
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0); // Set to start of the day
+
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Set to end of the day
+
+        const filtered = state.sales.filter(s => {
+            const saleDate = new Date(s.date);
+            return saleDate >= start && saleDate <= end;
+        });
+
+        renderReports(document.getElementById('content-area'), filtered.slice().reverse());
+    }
+
+    function printReport() {
+        window.print();
+    }
+
+    function exportReportToCSV() {
+        if (filteredSales.length === 0) {
+            showToast("রপ্তানি করার জন্য কোন ডাটা নেই।");
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        const headers = ["Invoice ID", "Date", "Customer Name", "Total", "Paid", "Due"];
+        csvContent += headers.join(",") + "\r\n";
+
+        filteredSales.forEach(sale => {
+            const customer = state.customers.find(c => c.id === sale.customerId) || { name: 'N/A' };
+            const row = [
+                sale.id,
+                new Date(sale.date).toLocaleString('bn-BD'),
+                `"${customer.name}"`,
+                sale.total,
+                sale.paidAmount || 0,
+                sale.dueAmount || 0
+            ];
+            csvContent += row.join(",") + "\r\n";
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "sales_report.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function toggleDashboardFeatures() {
+        const allFeatures = document.getElementById('all-dashboard-features');
+        const viewAllBtn = document.getElementById('view-all-features-btn');
+        if (allFeatures) {
+            allFeatures.classList.toggle('hidden');
+            if (allFeatures.classList.contains('hidden')) {
+                viewAllBtn.innerHTML = '<i data-lucide="more-horizontal"></i><span class="text-xs mt-1">সব দেখুন</span>';
+            } else {
+                viewAllBtn.innerHTML = '<i data-lucide="x"></i><span class="text-xs mt-1">বন্ধ করুন</span>';
+            }
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
     }
 
     // --- Dashboard Logic ---
@@ -1022,6 +1208,41 @@
             <div class="mb-8">
                 <h2 class="text-3xl font-black text-gray-800">ওভারভিউ</h2>
                 <p class="text-gray-500">আজকের ব্যবসার সংক্ষিপ্ত সারসংক্ষেপ</p>
+            </div>
+
+            <!-- Quick Actions for Mobile -->
+            <div class="grid grid-cols-4 gap-4 mb-6 md:hidden">
+                <button onclick="switchTab('pos')" class="bg-blue-500 text-white p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                    <i data-lucide="shopping-cart"></i>
+                    <span class="text-xs mt-1">নতুন সেল</span>
+                </button>
+                <button onclick="switchTab('inventory', () => toggleModal('product-modal'))" class="bg-green-500 text-white p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                    <i data-lucide="package-plus"></i>
+                    <span class="text-xs mt-1">নতুন পণ্য</span>
+                </button>
+                <button onclick="switchTab('reports')" class="bg-purple-500 text-white p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                    <i data-lucide="bar-chart-3"></i>
+                    <span class="text-xs mt-1">রিপোর্ট</span>
+                </button>
+                 <button id="view-all-features-btn" onclick="toggleDashboardFeatures()" class="bg-gray-700 text-white p-3 rounded-xl flex flex-col items-center justify-center text-center">
+                    <i data-lucide="more-horizontal"></i>
+                    <span class="text-xs mt-1">সব দেখুন</span>
+                </button>
+            </div>
+
+            <!-- All Dashboard Features (Hidden by default on mobile) -->
+            <div id="all-dashboard-features" class="hidden md:hidden bg-white p-4 rounded-2xl border mb-6">
+                <h3 class="font-bold mb-4">সকল ফিচার</h3>
+                <div class="grid grid-cols-3 gap-4">
+                    <button onclick="switchTab('dashboard')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="home" class="mb-1"></i><span class="text-xs">ড্যাশবোর্ড</span></button>
+                    <button onclick="switchTab('suppliers')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="users" class="mb-1"></i><span class="text-xs">ভেন্ডর</span></button>
+                    <button onclick="switchTab('inventory')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="box" class="mb-1"></i><span class="text-xs">ইনভেন্টরি</span></button>
+                    <button onclick="switchTab('pos')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="shopping-cart" class="mb-1"></i><span class="text-xs">POS</span></button>
+                    <button onclick="switchTab('reports')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="bar-chart-3" class="mb-1"></i><span class="text-xs">রিপোর্ট</span></button>
+                    <button onclick="switchTab('order-history')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="history" class="mb-1"></i><span class="text-xs">হিস্টোরি</span></button>
+                    <button onclick="switchTab('accounts')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="wallet" class="mb-1"></i><span class="text-xs">আর্থিক হিসাব</span></button>
+                    <button onclick="switchTab('customers')" class="text-gray-700 p-2 rounded-lg flex flex-col items-center text-center"><i data-lucide="users" class="mb-1"></i><span class="text-xs">কাস্টমার</span></button>
+                </div>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -1051,6 +1272,9 @@
                 </div>
             </div>
         `;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     // --- Financials ---
@@ -1073,6 +1297,7 @@
                 </div>
             </div>
         `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function updateDue(type, mult) {
@@ -1309,10 +1534,12 @@
         const a = document.createElement('a'); a.href = data; a.download = "shop_backup.json"; a.click();
     }
 
-    window.onload = () => {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         switchTab('dashboard');
-        setTimeout(() => { if(typeof lucide !== 'undefined') lucide.createIcons(); }, 500);
-    };
+    });
 </script>
 
 </body>

@@ -707,6 +707,7 @@
             const titles = { 'dashboard': 'ড্যাশবোর্ড', 'books': 'বই ম্যানেজমেন্ট', 'categories': 'ক্যাটাগরি', 'orders': 'অর্ডার ম্যানেজমেন্ট', 'settings': 'সেটিংস', 'users': 'ব্যবহারকারী ম্যানেজমেন্ট' };
             return titles[page] || 'ড্যাশবোর্ড';
         }
+<<<<<<< HEAD
 
         // --- CONTENT LOADERS ---
                 async function loadDashboard() {
@@ -1392,10 +1393,44 @@
             }
             processConfirm = async () => {
                 await confirmAction();
+=======
+
+        // --- CONTENT LOADERS ---
+        async function loadDashboard() { /* Full content here */ }
+        async function loadBooks() { /* Full content here */ }
+        async function loadCategories() { /* Full content here */ }
+        async function loadOrders() { /* Full content here */ }
+        async function loadSettings() { /* Full content here */ }
+        async function loadUsers() { /* Full content here */ }
+
+        // --- MODAL HANDLERS ---
+        window.openBookModal = async function(action, bookId = null) { /* ... */ };
+        window.closeModal = function() { document.getElementById('bookModal').classList.remove('active'); };
+        window.openOrderModal = async function(orderId) { /* ... */ };
+        window.closeOrderModal = function() { document.getElementById('orderModal').classList.remove('active'); };
+        window.openUserModal = async function(action, userId = null) { /* ... */ };
+        window.closeUserModal = function() { document.getElementById('userModal').classList.remove('active'); };
+        
+        // --- FORM SUBMISSIONS ---
+        async function onBookFormSubmit(e) { e.preventDefault(); /* ... */ }
+        async function onOrderFormSubmit(e) { e.preventDefault(); /* ... */ }
+        async function onUserFormSubmit(e) { e.preventDefault(); /* ... */ }
+
+        // --- CONFIRMATION MODAL ---
+        window.showConfirm = function(action, data, message) { /* ... */ };
+        window.closeConfirmModal = function() { /* ... */ };
+        window.processConfirm = async function() { /* ... */ };
+
+        // --- LOGOUT ---
+        window.logout = async function() {
+            if (confirm('আপনি কি লগআউট করতে চান?')) {
+                await auth.logoutAdmin();
+>>>>>>> 3a136afd9107f0e7edf6b8f6115dc5a7cc93a8b4
             }
         };
         
         // --- FILE UPLOAD ---
+<<<<<<< HEAD
         window.handleFileUpload = async function(input, targetId) {
             const file = input.files[0];
             if (!file) return;
@@ -1430,6 +1465,9 @@
                 input.value = ''; // Reset file input
             }
         };
+=======
+        window.handleFileUpload = function(input, targetId) { /* ... */ };
+>>>>>>> 3a136afd9107f0e7edf6b8f6115dc5a7cc93a8b4
     </script>
 </body>
 </html>
