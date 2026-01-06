@@ -8,12 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
     <!-- Firebase Libraries -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-analytics.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
 
         // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
             apiKey: "AIzaSyBtiCRqpSeDD9T1LTPJN8zX7E-lFEO69cs",
             authDomain: "enventory-bd354.firebaseapp.com",
@@ -29,16 +30,26 @@
         const analytics = getAnalytics(app);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-shop-pro';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'al-hera-prokashon';
 
         window.db = db;
         window.appId = appId;
+        window.firestore = { doc, setDoc, getDoc, onSnapshot, runTransaction };
+        window.auth = auth;
+        window.authFunctions = { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider };
+        window.firebaseConfig = firebaseConfig; // For secondary app initialization
+        window.firebaseApp = initializeApp; // For secondary app initialization
         
-        signInAnonymously(auth).catch(() => {});
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 window.userId = user.uid;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                await syncToCloud(); // Auto-sync local data on startup
                 loadDataFromCloud();
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
             }
         });
     </script>
@@ -63,16 +74,53 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 
+<!-- Login Screen -->
+<div id="login-screen" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-[100]">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-600 mb-2">Al Hera Publication</h1>
+            <p class="text-gray-500">ম্যানেজমেন্ট সিস্টেমে লগইন করুন</p>
+        </div>
+        <form onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">ইমেইল</label>
+                <input type="email" id="login-email" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500" required>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">পাসওয়ার্ড</label>
+                <input type="password" id="login-password" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500" required>
+            </div>
+            <div id="login-error" class="text-red-500 text-sm text-center hidden"></div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition">
+                লগইন
+            </button>
+        </form>
+        <div class="mt-6 text-center text-xs text-gray-400">
+            <p>ডিফল্ট অ্যাডমিন সেটআপের জন্য যোগাযোগ করুন।</p>
+            <button onclick="setupDefaultAdmin()" class="mt-2 text-blue-500 underline hover:text-blue-700">ডিফল্ট অ্যাডমিন তৈরি করুন (Click Here)</button>
+        </div>
+    </div>
+</div>
+
+<div id="main-app" class="hidden">
 <header class="flex justify-between items-center p-4 bg-white border-b no-print">
     <h1 class="text-xl font-bold text-blue-600">Al Hera Publication</h1>
-    <button id="menu-toggle-button" class="p-2 md:hidden" style="color: black; z-index: 51;">
-        <span class="menu-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </span>
-        <span class="close-icon hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </span>
-    </button>
+    <div class="flex items-center gap-3">
+        <button onclick="openProfileModal()" class="flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 px-1.5 py-1.5 pr-3 rounded-full transition-all shadow-sm group" title="প্রোফাইল">
+            <div class="bg-gray-100 group-hover:bg-blue-100 text-gray-600 group-hover:text-blue-600 rounded-full p-1.5 transition-colors">
+                <i data-lucide="user" class="w-5 h-5"></i>
+            </div>
+            <span class="text-sm font-semibold text-gray-700 group-hover:text-blue-600 hidden md:block">অ্যাকাউন্ট</span>
+        </button>
+        <button id="menu-toggle-button" class="p-2 md:hidden" style="color: black; z-index: 51;">
+            <span class="menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </span>
+            <span class="close-icon hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </span>
+        </button>
+    </div>
 </header>
 
 <div id="backdrop" class="fixed inset-0 bg-black/50 z-10 hidden"></div>
@@ -88,7 +136,7 @@
             <button onclick="switchTab('dashboard')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition sidebar-active" id="btn-dashboard">
                 <i data-lucide="home"></i> ড্যাশবোর্ড
             </button>
-            <button onclick="switchTab('suppliers')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-suppliers">
+            <button onclick="switchTab('suppliers')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition hidden" id="btn-suppliers">
                 <i data-lucide="users"></i> ভেন্ডর/সাপ্লায়ার
             </button>
             <button onclick="switchTab('inventory')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-inventory">
@@ -97,23 +145,33 @@
             <button onclick="switchTab('pos')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-pos">
                 <i data-lucide="shopping-cart"></i> পিওএস (POS)
             </button>
-            <button onclick="switchTab('reports')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-reports">
+            <button onclick="switchTab('reports')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition hidden" id="btn-reports">
                 <i data-lucide="bar-chart-3"></i> সেলস রিপোর্ট
             </button>
-            <button onclick="switchTab('order-history')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-order-history">
+            <button onclick="switchTab('order-history')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition hidden" id="btn-order-history">
                 <i data-lucide="history"></i> অর্ডার হিস্টোরি
             </button>
-            <button onclick="switchTab('accounts')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-accounts">
+            <button onclick="switchTab('accounts')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition hidden" id="btn-accounts">
                 <i data-lucide="wallet"></i> আর্থিক হিসাব
             </button>
             <button onclick="switchTab('customers')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition" id="btn-customers">
                 <i data-lucide="users"></i> কাস্টমার
             </button>
+            <button onclick="switchTab('users')" class="nav-btn w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition hidden" id="btn-users">
+                <i data-lucide="shield"></i> ইউজার ম্যানেজমেন্ট
+            </button>
         </nav>
         <div class="p-4 border-t">
             <div id="sync-status" class="text-xs text-center py-1 rounded bg-gray-100 text-gray-500 mb-2">Cloud Sync: Initializing...</div>
-            <button onclick="exportJSON()" class="w-full text-xs flex items-center justify-center gap-2 bg-gray-100 p-2 rounded hover:bg-gray-200">
+            <button onclick="exportJSON()" class="w-full text-xs flex items-center justify-center gap-2 bg-gray-100 p-2 rounded hover:bg-gray-200 mb-2">
                 <i data-lucide="download" class="w-3 h-3"></i> ব্যাকআপ ডাউনলোড
+            </button>
+            <button onclick="document.getElementById('import-file').click()" class="w-full text-xs flex items-center justify-center gap-2 bg-blue-50 text-blue-600 p-2 rounded hover:bg-blue-100 mb-2">
+                <i data-lucide="upload" class="w-3 h-3"></i> ব্যাকআপ রিস্টোর
+            </button>
+            <input type="file" id="import-file" class="hidden" accept=".json" onchange="importJSON(this)">
+            <button onclick="handleLogout()" class="w-full text-xs flex items-center justify-center gap-2 bg-red-50 text-red-600 p-2 rounded hover:bg-red-100">
+                <i data-lucide="log-out" class="w-3 h-3"></i> লগআউট
             </button>
         </div>
     </aside>
@@ -125,6 +183,58 @@
         </div>
         <div id="toast" class="fixed bottom-5 right-5 bg-black text-white px-6 py-3 rounded-lg opacity-0 transition-opacity pointer-events-none no-print z-50"></div>
     </main>
+</div>
+
+<!-- Profile Modal -->
+<div id="profile-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto relative">
+        <button onclick="toggleModal('profile-modal')" class="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-500 rounded-full transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+
+        <div class="text-center mb-6 mt-2">
+            <div class="relative inline-block">
+                <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 border-4 border-blue-100">
+                    <i data-lucide="user" class="w-10 h-10"></i>
+                </div>
+                <span id="profile-badge" class="absolute bottom-2 -right-2 px-3 py-1 rounded-full text-[10px] font-bold text-white bg-gray-500 border-2 border-white shadow-sm uppercase">Staff</span>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800">প্রোফাইল সেটিংস</h3>
+            <p class="text-sm text-gray-500">আপনার ব্যক্তিগত তথ্য আপডেট করুন</p>
+        </div>
+        
+        <!-- Profile Info -->
+        <form onsubmit="updateUserProfile(event)" class="space-y-4 mb-8 border-b pb-8">
+            <div>
+                <label class="text-sm font-bold text-gray-500">ইমেইল (পরিবর্তনযোগ্য নয়)</label>
+                <input type="email" id="profile-email" class="w-full p-3 border rounded-xl outline-none bg-gray-100 text-gray-500" readonly>
+            </div>
+            <div>
+                <label class="text-sm font-bold">নাম</label>
+                <input type="text" id="profile-name" class="w-full p-3 border rounded-xl outline-none" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-xl font-bold">তথ্য আপডেট করুন</button>
+        </form>
+
+        <!-- Change Password -->
+        <h4 class="font-bold text-lg mb-4 text-gray-700">পাসওয়ার্ড পরিবর্তন</h4>
+        <form onsubmit="changeUserPassword(event)" class="space-y-4">
+            <input type="password" id="old-password" placeholder="পুরাতন পাসওয়ার্ড" class="w-full p-3 border rounded-xl outline-none" required>
+            <input type="password" id="new-password" placeholder="নতুন পাসওয়ার্ড (min 6 chars)" class="w-full p-3 border rounded-xl outline-none" required minlength="6">
+            <input type="password" id="confirm-password" placeholder="নতুন পাসওয়ার্ড নিশ্চিত করুন" class="w-full p-3 border rounded-xl outline-none" required>
+            <button type="submit" class="w-full bg-red-50 text-red-600 py-2 rounded-xl font-bold hover:bg-red-100">পাসওয়ার্ড পরিবর্তন করুন</button>
+        </form>
+
+        <div class="mt-6 pt-4 border-t space-y-3">
+            <button onclick="handleLogout()" class="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2">
+                <i data-lucide="log-out" class="w-5 h-5"></i> লগআউট করুন
+            </button>
+            <button onclick="toggleModal('profile-modal')" class="w-full bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors">
+                বন্ধ করুন
+            </button>
+        </div>
+    </div>
+</div>
 </div>
 
 <script>
@@ -164,34 +274,77 @@
         history: JSON.parse(localStorage.getItem('ss_history')) || [],
         dueAccounts: JSON.parse(localStorage.getItem('ss_dues')) || { customer: 0, supplier: 0 },
         cart: [],
-        customers: JSON.parse(localStorage.getItem('ss_customers')) || []
+        customers: JSON.parse(localStorage.getItem('ss_customers')) || [],
+        users: [] // { email, role, name }
     };
 
     // --- Firebase Sync Logic ---
-    async function loadDataFromCloud() {
+    function loadDataFromCloud() {
         if (!window.db || !window.userId) return;
         try {
-            const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
-            const docRef = doc(window.db, 'artifacts', window.appId, 'users', window.userId, 'state', 'main');
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                state = { ...state, ...docSnap.data() };
+            const { doc, onSnapshot } = window.firestore;
+            const docRef = doc(window.db, 'artifacts', window.appId, 'app_data', 'main');
+            
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    state = { ...state, ...docSnap.data() };
+                }
+                checkUserRole(); // Re-check role (Moved outside if to handle fresh DB)
                 saveDataLocally();
-                updateSyncStatus("Cloud Synced ✅", "bg-green-100 text-green-600");
+                updateSyncStatus("Cloud Synced (Realtime) 🟢", "bg-green-100 text-green-600");
                 switchTab(currentTab);
-            }
-        } catch (e) { }
+            });
+        } catch (e) { console.error(e); }
     }
 
     async function syncToCloud() {
         if (!window.db || !window.userId) return;
         updateSyncStatus("Syncing...", "bg-yellow-50 text-yellow-600");
         try {
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
-            const docRef = doc(window.db, 'artifacts', window.appId, 'users', window.userId, 'state', 'main');
-            await setDoc(docRef, { ...state, lastUpdated: new Date().toISOString() });
+            const { doc, runTransaction } = window.firestore;
+            const docRef = doc(window.db, 'artifacts', window.appId, 'app_data', 'main');
+            
+            // কনসোল ভিজিবিলিটি ফিক্স: প্যারেন্ট ডকুমেন্ট তৈরি করা যাতে Firebase Console-এ ফোল্ডারটি ধূসর (italic) না দেখায়
+            const parentRef = doc(window.db, 'artifacts', window.appId);
+            window.firestore.setDoc(parentRef, { type: 'project_root' }, { merge: true }).catch(() => {});
+            
+            await runTransaction(window.db, async (transaction) => {
+                const sfDoc = await transaction.get(docRef);
+                if (!sfDoc.exists()) {
+                    transaction.set(docRef, { ...state, lastUpdated: new Date().toISOString() });
+                } else {
+                    const serverData = sfDoc.data();
+                    
+                    // Merge arrays by ID/Key to prevent data loss
+                    const mergeArrays = (local, server, key = 'id') => {
+                        if (!local) return server || [];
+                        if (!server) return local || [];
+                        const map = new Map(server.map(i => [i[key], i]));
+                        local.forEach(i => { if(i[key]) map.set(i[key], i); });
+                        return Array.from(map.values());
+                    };
+
+                    const newState = {
+                        ...serverData,
+                        ...state,
+                        products: mergeArrays(state.products, serverData.products, 'id'),
+                        sales: mergeArrays(state.sales, serverData.sales, 'id'),
+                        suppliers: mergeArrays(state.suppliers, serverData.suppliers, 'id'),
+                        customers: mergeArrays(state.customers, serverData.customers, 'id'),
+                        users: mergeArrays(state.users, serverData.users, 'email'),
+                        lastUpdated: new Date().toISOString()
+                    };
+                    transaction.set(docRef, newState);
+                }
+            });
             updateSyncStatus("Cloud Synced ✅", "bg-green-100 text-green-600");
-        } catch (e) { updateSyncStatus("Sync Failed", "bg-red-50 text-red-500"); }
+        } catch (e) { 
+            console.error("Sync Error:", e);
+            if (e.code === 'permission-denied') {
+                alert("ডাটা সেভ হচ্ছে না! Firebase Console এ Rules ঠিক করুন।");
+            }
+            updateSyncStatus("Sync Failed", "bg-red-50 text-red-500"); 
+        }
     }
 
     function saveDataLocally() {
@@ -213,6 +366,103 @@
         if (el) { el.innerText = text; el.className = `text-xs text-center py-1 rounded mb-2 ${classes}`; }
     }
 
+    // --- Auth & Role Logic ---
+    let currentUserRole = 'staff'; // Default safe role
+
+    function handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+
+        window.authFunctions.signInWithEmailAndPassword(window.auth, email, password)
+            .then(() => {
+                errorEl.classList.add('hidden');
+                // Role check happens in onAuthStateChanged -> loadDataFromCloud -> checkUserRole
+            })
+            .catch((error) => {
+                errorEl.innerText = "ইমেইল বা পাসওয়ার্ড ভুল হয়েছে!";
+                errorEl.classList.remove('hidden');
+                console.error(error);
+            });
+    }
+
+    async function setupDefaultAdmin() {
+        const email = "admin@alhera.com";
+        const password = "123456";
+        try {
+            await window.authFunctions.createUserWithEmailAndPassword(window.auth, email, password);
+            alert("অ্যাডমিন তৈরি সফল!\n\nইমেইল: " + email + "\nপাসওয়ার্ড: " + password + "\n\nএখন এই তথ্য দিয়ে লগইন করুন।");
+        } catch (error) {
+            if (error.code === 'auth/email-already-in-use') {
+                alert("এই অ্যাডমিন অ্যাকাউন্টটি ইতিমধ্যে তৈরি করা আছে।\n\nইমেইল: " + email + "\nপাসওয়ার্ড: " + password + "\n\nদয়া করে লগইন করুন।");
+            } else {
+                alert("ত্রুটি: " + error.message);
+            }
+        }
+    }
+
+    function handleLogout() {
+        window.authFunctions.signOut(window.auth).then(() => {
+            window.location.reload();
+        });
+    }
+
+    function checkUserRole() {
+        if (!window.auth.currentUser) return;
+        const email = window.auth.currentUser.email;
+        
+        // Force hardcoded admin for recovery
+        if (email === 'admin@alhera.com' || email === 'your.email@gmail.com') {
+            currentUserRole = 'admin';
+            // Ensure this admin is in the state list
+            if (!state.users.find(u => u.email === email)) {
+                state.users.push({ email: email, role: 'admin', name: 'Super Admin' });
+                saveData();
+            }
+            updateUIForRole();
+            return;
+        }
+
+        // If no users exist in DB, make the first user Admin (Setup Mode)
+        if (!state.users || state.users.length === 0) {
+            state.users = [{ email: email, role: 'admin', name: 'Admin' }];
+            saveData();
+        }
+
+        const userObj = state.users.find(u => u.email === email);
+        currentUserRole = userObj ? userObj.role : 'staff'; // Default to staff if not found
+        
+        updateUIForRole();
+    }
+
+    function updateUIForRole() {
+        const role = currentUserRole;
+        
+        // Hide all restricted buttons first
+        ['btn-dashboard', 'btn-suppliers', 'btn-reports', 'btn-order-history', 'btn-accounts', 'btn-users'].forEach(id => {
+            document.getElementById(id)?.classList.add('hidden');
+        });
+
+        // Show based on role
+        if (role === 'admin') {
+            ['btn-dashboard', 'btn-suppliers', 'btn-reports', 'btn-order-history', 'btn-accounts', 'btn-users'].forEach(id => {
+                document.getElementById(id)?.classList.remove('hidden');
+            });
+        } else if (role === 'manager') {
+            ['btn-dashboard', 'btn-suppliers', 'btn-reports', 'btn-order-history', 'btn-accounts'].forEach(id => {
+                document.getElementById(id)?.classList.remove('hidden');
+            });
+        } else {
+            // Staff: Only Inventory, POS, Customers are visible by default (not hidden in list above)
+        }
+        
+        // Refresh current tab if access lost
+        if (document.getElementById(`btn-${currentTab}`)?.classList.contains('hidden')) {
+            switchTab('pos');
+        }
+    }
+
     // --- Tab Switching ---
     let currentTab = 'dashboard';
     function switchTab(tab, callback) {
@@ -229,6 +479,7 @@
         else if (tab === 'order-history') renderOrderHistory(area);
         else if (tab === 'accounts') renderAccounts(area);
         else if (tab === 'customers') renderCustomers(area);
+        else if (tab === 'users') renderUsers(area);
 
         
 
@@ -239,6 +490,8 @@
 
     // --- Order History Logic ---
     let orderHistorySearchTerm = ''; // New state variable for search term
+    let orderHistoryPage = 1;
+    const itemsPerPage = 10;
 
     function renderOrderHistory(container) {
         let filteredSales = state.sales.slice().reverse();
@@ -253,6 +506,14 @@
                 return invoiceIdLower.includes(searchTermLower) || customerNameLower.includes(searchTermLower);
             });
         }
+
+        // Pagination Logic
+        const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
+        if (orderHistoryPage > totalPages) orderHistoryPage = totalPages || 1;
+        if (orderHistoryPage < 1) orderHistoryPage = 1;
+
+        const start = (orderHistoryPage - 1) * itemsPerPage;
+        const paginatedSales = filteredSales.slice(start, start + itemsPerPage);
 
         container.innerHTML = `
             <div class="flex justify-between items-center mb-6">
@@ -277,7 +538,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y">
-                        ${filteredSales.map(sale => {
+                        ${paginatedSales.map(sale => {
                             const customer = state.customers.find(c => c.id === sale.customerId) || { name: 'N/A' };
                             return `
                             <tr class="hover:bg-gray-50">
@@ -290,13 +551,36 @@
                                 <td class="p-4 text-right">
                                     <button onclick="openInvoiceModal('${sale.id}')" class="bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs font-bold">
                                         ইনভয়েস দেখুন
+                                <td class="p-4 text-right flex justify-end gap-2">
+                                    <button onclick="openInvoiceModal('${sale.id}')" class="bg-blue-100 text-blue-600 px-2 py-1 rounded text-xs font-bold" title="View">
+                                        <i data-lucide="eye" class="w-4 h-4"></i>
                                     </button>
+                                    ${currentUserRole === 'admin' ? `
+                                    <button onclick="openEditOrderModal('${sale.id}')" class="bg-green-100 text-green-600 px-2 py-1 rounded text-xs font-bold" title="Edit Payment">
+                                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                    </button>
+                                    <button onclick="deleteOrder('${sale.id}')" class="bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold" title="Delete">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>` : ''}
                                 </td>
                             </tr>
                             `;
                         }).join('') || '<tr><td colspan="7" class="p-10 text-center text-gray-300">কোন অর্ডার পাওয়া যায়নি।</td></tr>'}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="flex justify-between items-center mt-4 bg-white p-4 rounded-xl shadow-sm border">
+                <span class="text-sm text-gray-500">পৃষ্ঠা ${orderHistoryPage} / ${totalPages || 1} (মোট ${filteredSales.length} টি)</span>
+                <div class="flex gap-2">
+                    <button onclick="changeOrderHistoryPage(-1)" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed" ${orderHistoryPage === 1 ? 'disabled' : ''}>
+                        <i data-lucide="chevron-left" class="w-4 h-4 inline"></i> আগের
+                    </button>
+                    <button onclick="changeOrderHistoryPage(1)" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed" ${orderHistoryPage >= totalPages ? 'disabled' : ''}>
+                        পরের <i data-lucide="chevron-right" class="w-4 h-4 inline"></i>
+                    </button>
+                </div>
             </div>
 
             <!-- Invoice Modal -->
@@ -309,12 +593,36 @@
                     <button onclick="toggleModal('invoice-modal')" class="bg-red-500 text-white px-6 py-2 rounded-lg shadow-lg hover:bg-red-600 ml-2">বন্ধ করুন</button>
                 </div>
             </div>
+
+            <!-- Edit Order Modal -->
+            <div id="edit-order-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+                    <h3 class="text-xl font-bold mb-4">অর্ডার পেমেন্ট আপডেট</h3>
+                    <form onsubmit="updateOrder(event)" class="space-y-4">
+                        <input type="hidden" id="edit-order-id">
+                        <div>
+                            <label class="text-sm font-bold">পরিশোধিত টাকা (Paid Amount)</label>
+                            <input type="number" id="edit-order-paid" class="w-full p-3 border rounded-xl outline-none" required>
+                        </div>
+                        <div class="flex justify-end gap-2 pt-4">
+                            <button type="button" onclick="toggleModal('edit-order-modal')" class="text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl">আপডেট</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         `;
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
+    function changeOrderHistoryPage(delta) {
+        orderHistoryPage += delta;
+        renderOrderHistory(document.getElementById('content-area'));
+    }
+
     function handleOrderHistorySearch(term) {
         orderHistorySearchTerm = term;
+        orderHistoryPage = 1; // Reset to first page on search
         renderOrderHistory(document.getElementById('content-area'));
     }
 
@@ -398,6 +706,73 @@
         toggleModal('invoice-modal');
     }
 
+    function deleteOrder(saleId) {
+        if (currentUserRole !== 'admin') return showToast("শুধুমাত্র অ্যাডমিন অর্ডার ডিলিট করতে পারবে।");
+        if (!confirm("সতর্কতা: আপনি কি নিশ্চিত এই অর্ডারটি ডিলিট করতে চান?\n\nএটি ডিলিট করলে:\n১. পণ্যের স্টক ফেরত আসবে।\n২. কাস্টমারের ডিউ/বাকি কমে যাবে।")) return;
+
+        const saleIndex = state.sales.findIndex(s => s.id === saleId);
+        if (saleIndex === -1) return;
+        const sale = state.sales[saleIndex];
+
+        // 1. Restore Stock
+        sale.items.forEach(item => {
+            const product = state.products.find(p => p.id === item.id);
+            if (product) product.stock += item.qty;
+        });
+
+        // 2. Adjust Customer Due (Reverse the due amount added by this sale)
+        if (sale.customerId) {
+            const customer = state.customers.find(c => c.id === sale.customerId);
+            if (customer) {
+                customer.totalDue = (customer.totalDue || 0) - (sale.dueAmount || 0);
+                if (customer.totalDue < 0) customer.totalDue = 0; // Safety check
+            }
+        }
+
+        state.sales.splice(saleIndex, 1);
+        saveData();
+        renderOrderHistory(document.getElementById('content-area'));
+        showToast("অর্ডার ডিলিট এবং স্টক রিস্টোর করা হয়েছে।");
+    }
+
+    function openEditOrderModal(saleId) {
+        const sale = state.sales.find(s => s.id === saleId);
+        if (!sale) return;
+        document.getElementById('edit-order-id').value = sale.id;
+        document.getElementById('edit-order-paid').value = sale.paidAmount;
+        toggleModal('edit-order-modal');
+    }
+
+    function updateOrder(e) {
+        e.preventDefault();
+        const saleId = document.getElementById('edit-order-id').value;
+        const newPaid = parseFloat(document.getElementById('edit-order-paid').value);
+        const sale = state.sales.find(s => s.id === saleId);
+        
+        if (!sale) return;
+
+        // Calculate difference to adjust customer due
+        const oldDue = sale.dueAmount;
+        const newDue = sale.total - newPaid;
+
+        // Update Sale
+        sale.paidAmount = newPaid;
+        sale.dueAmount = newDue;
+
+        // Update Customer Due
+        if (sale.customerId) {
+            const customer = state.customers.find(c => c.id === sale.customerId);
+            if (customer) {
+                customer.totalDue = (customer.totalDue || 0) - oldDue + newDue;
+            }
+        }
+
+        saveData();
+        toggleModal('edit-order-modal');
+        renderOrderHistory(document.getElementById('content-area'));
+        showToast("অর্ডার আপডেট হয়েছে।");
+    }
+
     // --- Suppliers Logic ---
     function renderSuppliers(container) {
         container.innerHTML = `
@@ -408,23 +783,11 @@
                 </button>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                ${state.suppliers.map((v, idx) => `
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="building-2"></i></div>
-                            <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${v.id}</span>
-                        </div>
-                        <h4 class="font-bold text-lg">${v.name}</h4>
-                        <p class="text-sm text-gray-500 mt-2">📞 ${v.phone}</p>
-                        <p class="text-sm text-gray-500">📍 ${v.address || 'ঠিকানা নেই'}</p>
-                        <div class="mt-4 pt-4 border-t flex justify-between">
-                            <span class="text-xs text-blue-600 font-bold">পণ্য: ${state.products.filter(p=>p.vendorId === v.id).length}টি</span>
-                            <button onclick="deleteVendor(${idx})" class="text-red-400 hover:text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </div>
-                    </div>
-                `).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন ভেন্ডর পাওয়া যায়নি।</div>'}
+            <div class="mb-6">
+                <input type="text" oninput="handleVendorSearch(this.value)" placeholder="নাম বা ফোন নম্বর দিয়ে খুঁজুন..." class="w-full p-3 border rounded-xl outline-none">
             </div>
+            
+            <div id="vendor-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
 
             <!-- Vendor Modal -->
             <div id="vendor-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -442,7 +805,64 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Edit Vendor Modal -->
+            <div id="edit-vendor-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <h3 class="text-xl font-bold mb-4">ভেন্ডর তথ্য আপডেট</h3>
+                    <form onsubmit="updateVendor(event)" class="space-y-4">
+                        <input type="hidden" id="edit-v-index">
+                        <div>
+                            <label class="text-sm font-bold text-gray-500">ভেন্ডর আইডি (Read-only)</label>
+                            <input type="text" id="edit-v-id" class="w-full p-3 border rounded-xl outline-none bg-gray-100" readonly>
+                        </div>
+                        <input type="text" id="edit-v-name" placeholder="ভেন্ডর/কোম্পানির নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="edit-v-phone" placeholder="ফোন নম্বর" class="w-full p-3 border rounded-xl outline-none" required>
+                        <textarea id="edit-v-address" placeholder="ঠিকানা" class="w-full p-3 border rounded-xl outline-none"></textarea>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="toggleModal('edit-vendor-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl">আপডেট</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         `;
+        renderVendorGrid(state.suppliers.filter(s => !s.isDeleted));
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function handleVendorSearch(term) {
+        const lower = term.toLowerCase();
+        const filtered = state.suppliers.filter(s => !s.isDeleted && (s.name.toLowerCase().includes(lower) || s.phone.includes(term)));
+        renderVendorGrid(filtered);
+    }
+
+    function renderVendorGrid(list) {
+        const grid = document.getElementById('vendor-grid');
+        if(!grid) return;
+        
+        grid.innerHTML = list.map((v) => {
+            const idx = state.suppliers.findIndex(s => s.id === v.id);
+            return `
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="building-2"></i></div>
+                        <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${v.id}</span>
+                    </div>
+                    <h4 class="font-bold text-lg">${v.name}</h4>
+                    <p class="text-sm text-gray-500 mt-2">📞 ${v.phone}</p>
+                    <p class="text-sm text-gray-500">📍 ${v.address || 'ঠিকানা নেই'}</p>
+                    <div class="mt-4 pt-4 border-t flex justify-between items-center">
+                        <span class="text-xs text-blue-600 font-bold">পণ্য: ${state.products.filter(p=>p.vendorId === v.id).length}টি</span>
+                        <div class="flex gap-2">
+                            <button onclick="openEditVendorModal(${idx})" class="text-green-500 hover:text-green-700 flex items-center gap-1 text-xs font-bold" title="Edit"><i data-lucide="edit-2" class="w-3 h-3"></i> এডিট</button>
+                            <button onclick="deleteVendor(${idx})" class="text-red-400 hover:text-red-600 flex items-center gap-1 text-xs font-bold" title="Delete"><i data-lucide="trash-2" class="w-3 h-3"></i> ডিলিট</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন ভেন্ডর পাওয়া যায়নি।</div>';
+        
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
@@ -463,10 +883,38 @@
 
     function deleteVendor(idx) {
         if(confirm("ভেন্ডরটি ডিলিট করতে চান?")) {
-            state.suppliers.splice(idx, 1);
+            // Soft delete to prevent sync restoration issues
+            state.suppliers[idx].isDeleted = true;
             saveData();
             switchTab('suppliers');
         }
+    }
+
+    function openEditVendorModal(idx) {
+        const vendor = state.suppliers[idx];
+        if (!vendor) return;
+        document.getElementById('edit-v-index').value = idx;
+        document.getElementById('edit-v-id').value = vendor.id;
+        document.getElementById('edit-v-name').value = vendor.name;
+        document.getElementById('edit-v-phone').value = vendor.phone;
+        document.getElementById('edit-v-address').value = vendor.address || '';
+        toggleModal('edit-vendor-modal');
+    }
+
+    function updateVendor(e) {
+        e.preventDefault();
+        const idx = document.getElementById('edit-v-index').value;
+        const vendor = state.suppliers[idx];
+        if (!vendor) return;
+
+        vendor.name = document.getElementById('edit-v-name').value;
+        vendor.phone = document.getElementById('edit-v-phone').value;
+        vendor.address = document.getElementById('edit-v-address').value;
+
+        saveData();
+        toggleModal('edit-vendor-modal');
+        renderSuppliers(document.getElementById('content-area'));
+        showToast("ভেন্ডর তথ্য আপডেট হয়েছে!");
     }
 
     // --- Inventory Logic ---
@@ -494,7 +942,7 @@
                 <td class="p-4 text-right space-x-2">
                     <button onclick="openEditModal(${originalIndex})" class="text-green-500 text-xs font-bold">ইডিট</button>
                     <button onclick="adjustStock(${originalIndex})" class="text-blue-500 text-xs">স্টক+</button>
-                    <button onclick="deleteProduct(${originalIndex})" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
+                    <button onclick="deleteProduct(${originalIndex})" class="text-red-400 text-xs font-bold" title="Delete"><i data-lucide="trash-2" class="w-3 h-3 inline"></i> ডিলিট</button>
                 </td>
             </tr>`;
         }).join('') || '<tr><td colspan="6" class="p-10 text-center text-gray-300">কোন পণ্য পাওয়া যায়নি।</td></tr>';
@@ -503,10 +951,11 @@
     function handleInventorySearch(term) {
         const lowerCaseTerm = term.toLowerCase().trim();
         if (!lowerCaseTerm) {
-            renderInventoryTable(state.products);
+            renderInventoryTable(state.products.filter(p => !p.isDeleted));
             return;
         }
         const filteredProducts = state.products.filter(p => {
+            if (p.isDeleted) return false;
             const vendor = state.suppliers.find(s => s.id === p.vendorId);
             const vendorName = vendor ? vendor.name.toLowerCase() : '';
             return p.name.toLowerCase().includes(lowerCaseTerm) ||
@@ -593,7 +1042,7 @@
                             <label class="text-sm font-bold">ভেন্ডর</label>
                             <select id="edit-p-vendor" class="w-full p-3 border rounded-xl outline-none" required>
                                 <option value="">ভেন্ডর সিলেক্ট করুন</option>
-                                ${state.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+                                ${state.suppliers.filter(s => !s.isDeleted).map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-4">
@@ -614,7 +1063,7 @@
                 </div>
             </div>
         `;
-        renderInventoryTable(state.products);
+        renderInventoryTable(state.products.filter(p => !p.isDeleted));
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
@@ -637,7 +1086,8 @@
 
     function deleteProduct(idx) {
         if(confirm("ডিলিট করতে চান?")) {
-            state.products.splice(idx, 1);
+            // Soft delete to prevent sync restoration issues
+            state.products[idx].isDeleted = true;
             saveData();
             switchTab('inventory');
         }
@@ -826,10 +1276,10 @@
         `;
         const searchEl = document.getElementById('pos-search');
         searchEl.addEventListener('input', (e) => {
-            const filtered = state.products.filter(p => p.name.toLowerCase().includes(e.target.value.toLowerCase()) || p.id.includes(e.target.value));
+            const filtered = state.products.filter(p => !p.isDeleted && (p.name.toLowerCase().includes(e.target.value.toLowerCase()) || p.id.includes(e.target.value)));
             renderPOSGrid(filtered);
         });
-        renderPOSGrid(state.products);
+        renderPOSGrid(state.products.filter(p => !p.isDeleted));
         updateCartUI();
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
@@ -1039,6 +1489,50 @@
     // --- Reports Logic ---
     let filteredSales = [];
 
+    async function deleteOldData() {
+        if (currentUserRole !== 'admin') {
+            showToast("শুধুমাত্র অ্যাডমিন পুরনো ডাটা ডিলিট করতে পারবে।");
+            return;
+        }
+
+        const months = prompt("কত মাসের পুরনো ডাটা ডিলিট করতে চান? (উদাহরণ: 6)");
+        if (!months || isNaN(months)) return;
+
+        const confirmDelete = confirm(`সতর্কতা: আপনি ${months} মাসের পুরনো সব সেলস হিস্টোরি এবং লগ ডিলিট করতে যাচ্ছেন। এটি ডাটাবেস থেকে স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?`);
+        if (!confirmDelete) return;
+
+        updateSyncStatus("Deleting...", "bg-red-50 text-red-600");
+
+        try {
+            const { doc, runTransaction } = window.firestore;
+            const docRef = doc(window.db, 'artifacts', window.appId, 'app_data', 'main');
+            const cutoffDate = new Date();
+            cutoffDate.setMonth(cutoffDate.getMonth() - parseInt(months));
+
+            let deletedCount = 0;
+
+            await runTransaction(window.db, async (transaction) => {
+                const sfDoc = await transaction.get(docRef);
+                if (!sfDoc.exists()) throw "Document does not exist!";
+
+                const serverData = sfDoc.data();
+                const newSales = (serverData.sales || []).filter(s => new Date(s.date) >= cutoffDate);
+                const newHistory = (serverData.history || []).filter(h => new Date(h.date) >= cutoffDate);
+
+                deletedCount = (serverData.sales?.length || 0) + (serverData.history?.length || 0) - (newSales.length + newHistory.length);
+
+                transaction.update(docRef, { sales: newSales, history: newHistory, lastUpdated: new Date().toISOString() });
+                state.sales = newSales;
+                state.history = newHistory;
+            });
+
+            saveDataLocally();
+            updateSyncStatus("Cleanup Done ✅", "bg-green-100 text-green-600");
+            showToast(`${deletedCount}টি পুরনো রেকর্ড ডিলিট করা হয়েছে।`);
+            if (currentTab === 'reports') renderReports(document.getElementById('content-area'));
+        } catch (e) { console.error(e); updateSyncStatus("Delete Failed", "bg-red-50 text-red-500"); showToast("ডাটা ডিলিট ব্যর্থ হয়েছে।"); }
+    }
+
     function renderReports(container, salesData = null) {
         const salesToDisplay = salesData || state.sales.slice().reverse();
         filteredSales = salesToDisplay; // Store for export
@@ -1070,16 +1564,19 @@
                         <label for="end-date" class="text-sm font-medium">শেষ তারিখ</label>
                         <input type="date" id="end-date" class="w-full p-2 border rounded-lg mt-1" value="${endDateValue || ''}">
                     </div>
-                    <div class="md:col-span-2 flex gap-2">
-                        <button onclick="filterSalesReport()" class="w-full bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
-                            <i data-lucide="filter"></i> ফিল্টার
+                    <div class="md:col-span-2 grid grid-cols-2 md:flex gap-2">
+                        <button onclick="filterSalesReport()" class="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs md:text-sm flex-1">
+                            <i data-lucide="filter" class="w-4 h-4"></i> ফিল্টার
                         </button>
-                        <button onclick="printReport()" class="w-full bg-gray-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
-                            <i data-lucide="printer"></i> প্রিন্ট
+                        <button onclick="printReport()" class="bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs md:text-sm flex-1">
+                            <i data-lucide="printer" class="w-4 h-4"></i> প্রিন্ট
                         </button>
-                        <button onclick="exportReportToCSV()" class="w-full bg-green-600 text-white px-5 py-2 rounded-lg flex items-center justify-center gap-2">
-                            <i data-lucide="download"></i> CSV
+                        <button onclick="exportReportToCSV()" class="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs md:text-sm flex-1">
+                            <i data-lucide="download" class="w-4 h-4"></i> CSV
                         </button>
+                        ${currentUserRole === 'admin' ? `<button onclick="deleteOldData()" class="bg-red-100 text-red-600 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs md:text-sm flex-1 hover:bg-red-200">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> ক্লিনআপ
+                        </button>` : ''}
                     </div>
                 </div>
             </div>
@@ -1280,7 +1777,7 @@
                 </div>
                 <div class="bg-white p-6 rounded-3xl border shadow-sm">
                     <p class="text-xs font-bold text-gray-400 uppercase">মোট ভেন্ডর</p>
-                    <h3 class="text-3xl font-black text-gray-800">${state.suppliers.length} জন</h3>
+                    <h3 class="text-3xl font-black text-gray-800">${state.suppliers.filter(s => !s.isDeleted).length} জন</h3>
                 </div>
             </div>
 
@@ -1346,32 +1843,11 @@
                 </button>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                ${state.customers.map((c, idx) => `
-                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-start mb-4">
-                            <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="user"></i></div>
-                            <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${c.id}</span>
-                        </div>
-                        <h4 class="font-bold text-lg">${c.name}</h4>
-                        <p class="text-sm text-gray-500 mt-2">📞 ${c.phone}</p>
-                        <p class="text-sm text-gray-500">📧 ${c.email || 'নেই'}</p>
-                        <p class="text-sm text-gray-500">🏠 ${c.address || 'নেই'}</p>
-                        <p class="text-sm text-gray-500">🏢 ${c.shopName || 'নেই'}</p>
-                        <p class="font-bold text-red-500 mt-2">বাকি: ৳${(c.totalDue || 0).toLocaleString()}</p>
-                        <div class="mt-4 pt-4 border-t flex justify-between items-center">
-                            <div class="space-x-2">
-                                <button onclick="openCustomerPaymentModal(${idx})" class="text-blue-500 text-xs font-bold">পেমেন্ট</button>
-                                <button onclick="openEditCustomerModal(${idx})" class="text-green-500 text-xs font-bold">ইডিট</button>
-                                <button onclick="deleteCustomer(${idx})" class="text-red-400"><i data-lucide="trash-2" class="w-4 h-4 inline"></i></button>
-                            </div>
-                            ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g,'')}" target="_blank" class="text-blue-500 text-xs flex items-center gap-1">
-                                <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp
-                            </a>` : ''}
-                        </div>
-                    </div>
-                `).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন কাস্টমার পাওয়া যায়নি।</div>'}
+            <div class="mb-6">
+                <input type="text" oninput="handleCustomerListSearch(this.value)" placeholder="নাম বা ফোন নম্বর দিয়ে খুঁজুন..." class="w-full p-3 border rounded-xl outline-none">
             </div>
+            
+            <div id="customer-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
             <!-- Customer Payment Modal -->
             <div id="customer-payment-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -1438,6 +1914,48 @@
                 </div>
             </div>
         `;
+        renderCustomerGrid(state.customers.filter(c => !c.isDeleted));
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function handleCustomerListSearch(term) {
+        const lower = term.toLowerCase();
+        const filtered = state.customers.filter(c => !c.isDeleted && (c.name.toLowerCase().includes(lower) || c.phone.includes(term)));
+        renderCustomerGrid(filtered);
+    }
+
+    function renderCustomerGrid(list) {
+        const grid = document.getElementById('customer-grid');
+        if (!grid) return;
+
+        grid.innerHTML = list.map((c) => {
+            const idx = state.customers.findIndex(original => original.id === c.id);
+            return `
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="bg-blue-50 p-3 rounded-lg text-blue-600"><i data-lucide="user"></i></div>
+                        <span class="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded">ID: ${c.id}</span>
+                    </div>
+                    <h4 class="font-bold text-lg">${c.name}</h4>
+                    <p class="text-sm text-gray-500 mt-2">📞 ${c.phone}</p>
+                    <p class="text-sm text-gray-500">📧 ${c.email || 'নেই'}</p>
+                    <p class="text-sm text-gray-500">🏠 ${c.address || 'নেই'}</p>
+                    <p class="text-sm text-gray-500">🏢 ${c.shopName || 'নেই'}</p>
+                    <p class="font-bold text-red-500 mt-2">বাকি: ৳${(c.totalDue || 0).toLocaleString()}</p>
+                    <div class="mt-4 pt-4 border-t flex justify-between items-center">
+                        <div class="flex gap-2">
+                            <button onclick="openCustomerPaymentModal(${idx})" class="text-blue-500 text-xs font-bold bg-blue-50 px-2 py-1 rounded hover:bg-blue-100">পেমেন্ট</button>
+                            <button onclick="openEditCustomerModal(${idx})" class="text-green-500 text-xs font-bold flex items-center gap-1" title="Edit"><i data-lucide="edit-2" class="w-3 h-3"></i> এডিট</button>
+                            <button onclick="deleteCustomer(${idx})" class="text-red-400 text-xs font-bold flex items-center gap-1 hover:text-red-600" title="Delete"><i data-lucide="trash-2" class="w-3 h-3"></i> ডিলিট</button>
+                        </div>
+                        ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g,'')}" target="_blank" class="text-blue-500 text-xs flex items-center gap-1">
+                            <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp
+                        </a>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('') || '<div class="col-span-full text-center py-20 text-gray-400">কোন কাস্টমার পাওয়া যায়নি।</div>';
+        
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
@@ -1496,7 +2014,8 @@
 
     function deleteCustomer(index) {
         if(confirm("এই কাস্টমারকে ডিলিট করতে চান?")) {
-            state.customers.splice(index, 1);
+            // Soft delete to prevent sync restoration issues
+            state.customers[index].isDeleted = true;
             saveData();
             switchTab('customers');
             showToast("কাস্টমার ডিলিট হয়েছে!");
@@ -1546,6 +2065,229 @@
         showToast(`৳${amount} পেমেন্ট রেকর্ড হয়েছে।`);
     }
 
+    // --- User Management (Admin Only) ---
+    function renderUsers(container) {
+        if (currentUserRole !== 'admin') {
+            container.innerHTML = '<div class="text-center p-10 text-red-500">আপনার এই পেজ দেখার অনুমতি নেই।</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">ইউজার ম্যানেজমেন্ট</h2>
+                <button onclick="toggleModal('add-user-modal')" class="bg-blue-600 text-white px-5 py-2 rounded-xl flex items-center gap-2">
+                    <i data-lucide="user-plus"></i> নতুন ইউজার তৈরি করুন
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="p-4">নাম</th>
+                            <th class="p-4">ইমেইল</th>
+                            <th class="p-4">রোল</th>
+                            <th class="p-4 text-right">অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        ${state.users.map((u, idx) => `
+                            <tr>
+                                <td class="p-4 font-bold">${u.name}</td>
+                                <td class="p-4">${u.email}</td>
+                                <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${u.role==='admin'?'bg-purple-100 text-purple-600':(u.role==='manager'?'bg-blue-100 text-blue-600':'bg-gray-100 text-gray-600')}">${u.role.toUpperCase()}</span></td>
+                                <td class="p-4 text-right">
+                                    ${u.email !== window.auth.currentUser.email ? `<button onclick="deleteUser(${idx})" class="text-red-500 text-xs hover:underline">ডিলিট</button>` : '<span class="text-gray-400 text-xs">বর্তমান ইউজার</span>'}
+                                <td class="p-4 text-right space-x-2">
+                                    <button onclick="openEditUserModal(${idx})" class="text-green-500 text-xs font-bold">ইডিট</button>
+                                    ${u.email !== window.auth.currentUser.email ? `<button onclick="deleteUser(${idx})" class="text-red-500 text-xs hover:underline">ডিলিট</button>` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add User Modal -->
+            <div id="add-user-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <h3 class="text-xl font-bold mb-4">নতুন ইউজার তৈরি</h3>
+                    <form onsubmit="createNewUser(event)" class="space-y-4">
+                        <input type="text" id="new-user-name" placeholder="নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="email" id="new-user-email" placeholder="ইমেইল" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="password" id="new-user-pass" placeholder="পাসওয়ার্ড (min 6 chars)" class="w-full p-3 border rounded-xl outline-none" required minlength="6">
+                        <select id="new-user-role" class="w-full p-3 border rounded-xl outline-none">
+                            <option value="staff">Staff</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <div class="flex justify-end gap-2 pt-4">
+                            <button type="button" onclick="toggleModal('add-user-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl">তৈরি করুন</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit User Modal -->
+            <div id="edit-user-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-2xl w-full max-w-md p-6">
+                    <h3 class="text-xl font-bold mb-4">ইউজার তথ্য আপডেট</h3>
+                    <form onsubmit="updateUser(event)" class="space-y-4">
+                        <input type="hidden" id="edit-user-index">
+                        <input type="text" id="edit-user-name" placeholder="নাম" class="w-full p-3 border rounded-xl outline-none" required>
+                        <input type="text" id="edit-user-email" class="w-full p-3 border rounded-xl outline-none bg-gray-100" readonly>
+                        <select id="edit-user-role" class="w-full p-3 border rounded-xl outline-none">
+                            <option value="staff">Staff</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <div class="flex justify-end gap-2 pt-4">
+                            <button type="button" onclick="toggleModal('edit-user-modal')" class="px-4 py-2 text-gray-500">বাতিল</button>
+                            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-xl">আপডেট</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    async function createNewUser(e) {
+        e.preventDefault();
+        const name = document.getElementById('new-user-name').value;
+        const email = document.getElementById('new-user-email').value;
+        const password = document.getElementById('new-user-pass').value;
+        const role = document.getElementById('new-user-role').value;
+
+        try {
+            // Use a secondary app instance to create user without logging out the admin
+            const secondaryApp = window.firebaseApp(window.firebaseConfig, "SecondaryApp");
+            const secondaryAuth = window.authFunctions.getAuth(secondaryApp);
+            
+            await window.authFunctions.createUserWithEmailAndPassword(secondaryAuth, email, password);
+            
+            // Add to database state
+            state.users.push({ name, email, role });
+            saveData();
+            
+            // Cleanup
+            window.authFunctions.signOut(secondaryAuth); // Sign out secondary
+            // Note: deleteApp is not imported, but leaving the instance is fine for this scope or we can just ignore it.
+
+            toggleModal('add-user-modal');
+            renderUsers(document.getElementById('content-area'));
+            showToast("নতুন ইউজার তৈরি সফল হয়েছে!");
+        } catch (error) {
+            console.error(error);
+            showToast("ইউজার তৈরি ব্যর্থ হয়েছে: " + error.message);
+        }
+    }
+
+    function openEditUserModal(idx) {
+        const user = state.users[idx];
+        if (!user) return;
+        document.getElementById('edit-user-index').value = idx;
+        document.getElementById('edit-user-name').value = user.name;
+        document.getElementById('edit-user-email').value = user.email;
+        document.getElementById('edit-user-role').value = user.role;
+        toggleModal('edit-user-modal');
+    }
+
+    function updateUser(e) {
+        e.preventDefault();
+        const idx = document.getElementById('edit-user-index').value;
+        state.users[idx].name = document.getElementById('edit-user-name').value;
+        state.users[idx].role = document.getElementById('edit-user-role').value;
+        saveData();
+        toggleModal('edit-user-modal');
+        renderUsers(document.getElementById('content-area'));
+        showToast("ইউজার তথ্য আপডেট হয়েছে!");
+    }
+
+    function deleteUser(idx) {
+        if(confirm("এই ইউজারকে সিস্টেম থেকে রিমুভ করতে চান? (Firebase Auth থেকে ম্যানুয়ালি রিমুভ করতে হবে)")) {
+            state.users.splice(idx, 1);
+            saveData();
+            renderUsers(document.getElementById('content-area'));
+        }
+    }
+
+    // --- Profile & Password Logic ---
+    function openProfileModal() {
+        const user = window.auth.currentUser;
+        if (!user) return;
+        
+        const localUser = state.users.find(u => u.email === user.email) || {};
+        
+        document.getElementById('profile-email').value = user.email;
+        document.getElementById('profile-name').value = localUser.name || user.displayName || '';
+
+        // Update Badge
+        const role = (localUser.role || 'staff').toLowerCase();
+        const badge = document.getElementById('profile-badge');
+        if (badge) {
+            badge.innerText = role.toUpperCase();
+            badge.className = `absolute bottom-2 -right-2 px-3 py-1 rounded-full text-[10px] font-bold text-white border-2 border-white shadow-sm uppercase ${
+                role === 'admin' ? 'bg-purple-600' : (role === 'manager' ? 'bg-blue-600' : 'bg-gray-500')
+            }`;
+        }
+        
+        // Reset password fields
+        document.getElementById('old-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+        
+        toggleModal('profile-modal');
+    }
+
+    async function updateUserProfile(e) {
+        e.preventDefault();
+        const name = document.getElementById('profile-name').value;
+        const user = window.auth.currentUser;
+        
+        try {
+            await window.authFunctions.updateProfile(user, { displayName: name });
+            
+            // Update local state
+            const localUserIdx = state.users.findIndex(u => u.email === user.email);
+            if (localUserIdx !== -1) {
+                state.users[localUserIdx].name = name;
+                saveData();
+            }
+            
+            showToast("প্রোফাইল আপডেট হয়েছে!");
+        } catch (error) {
+            console.error(error);
+            showToast("আপডেট ব্যর্থ হয়েছে: " + error.message);
+        }
+    }
+
+    async function changeUserPassword(e) {
+        e.preventDefault();
+        const oldPass = document.getElementById('old-password').value;
+        const newPass = document.getElementById('new-password').value;
+        const confirmPass = document.getElementById('confirm-password').value;
+        
+        if (newPass !== confirmPass) return showToast("নতুন পাসওয়ার্ড মিলছে না!");
+        
+        const user = window.auth.currentUser;
+        const credential = window.authFunctions.EmailAuthProvider.credential(user.email, oldPass);
+
+        try {
+            await window.authFunctions.reauthenticateWithCredential(user, credential);
+            await window.authFunctions.updatePassword(user, newPass);
+            showToast("পাসওয়ার্ড পরিবর্তন সফল হয়েছে!");
+            document.getElementById('old-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } catch (error) {
+            console.error(error);
+            if (error.code === 'auth/wrong-password') showToast("পুরাতন পাসওয়ার্ড ভুল!");
+            else showToast("ত্রুটি: " + error.message);
+        }
+    }
+
     // --- Utilities ---
     function toggleModal(id) { document.getElementById(id).classList.toggle('hidden'); }
     function showToast(msg) {
@@ -1556,6 +2298,30 @@
     function exportJSON() {
         const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
         const a = document.createElement('a'); a.href = data; a.download = "shop_backup.json"; a.click();
+    }
+
+    function importJSON(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (confirm("সতর্কতা: ব্যাকআপ রিস্টোর করলে বর্তমান ডাটা প্রতিস্থাপন করা হবে। আপনি কি নিশ্চিত?")) {
+                    state = { ...state, ...data };
+                    saveData(); // Save to local and cloud
+                    alert("ডাটা রিস্টোর সফল হয়েছে! পেজ রিলোড হচ্ছে...");
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("ভুল ফাইল ফরম্যাট! সঠিক JSON ফাইল আপলোড করুন।");
+            }
+            input.value = ''; // Reset input
+        };
+        reader.readAsText(file);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
